@@ -8,7 +8,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from . import services
-from .models import Consumible, Impresora, Movimiento
+from .models import Consumible, Impresora, ImpresoraConsumible, Movimiento
 
 
 def _err(msg, status=400):
@@ -116,10 +116,70 @@ def consumible_detalle(request, pk):
     return JsonResponse(_cons(c))
 
 
-@require_GET
+def _datos_impresora(d):
+    datos = {k: _txt(d, k) for k in ("departamento", "marca", "modelo", "tipo")}
+    if not datos["departamento"]:
+        raise ValueError("El departamento es obligatorio")
+    if not datos["modelo"]:
+        raise ValueError("El modelo es obligatorio")
+    return datos
+
+
+@require_http_methods(["GET", "POST"])
 def impresoras(request):
-    qs = Impresora.objects.prefetch_related("consumibles__consumible")
-    return JsonResponse([_impresora(p) for p in qs], safe=False)
+    if request.method == "GET":
+        qs = Impresora.objects.prefetch_related("consumibles__consumible")
+        return JsonResponse([_impresora(p) for p in qs], safe=False)
+    try:
+        p = Impresora.objects.create(**_datos_impresora(_body(request)))
+    except ValueError as e:
+        return _err(str(e))
+    return JsonResponse(_impresora(p), status=201)
+
+
+@require_http_methods(["PUT", "DELETE"])
+def impresora_detalle(request, pk):
+    try:
+        p = Impresora.objects.get(pk=pk)
+    except Impresora.DoesNotExist:
+        return _err("Impresora no encontrada", 404)
+    if request.method == "DELETE":
+        p.delete()
+        return JsonResponse({"ok": True})
+    try:
+        datos = _datos_impresora(_body(request))
+    except ValueError as e:
+        return _err(str(e))
+    for campo, valor in datos.items():
+        setattr(p, campo, valor)
+    p.save()
+    return JsonResponse(_impresora(p))
+
+
+@require_POST
+def impresora_linea_nueva(request, pk):
+    d = _body(request)
+    try:
+        p = Impresora.objects.get(pk=pk)
+        c = Consumible.objects.get(pk=_entero(d.get("consumable_id"), "El consumible", minimo=1))
+    except ValueError as e:
+        return _err(str(e))
+    except Impresora.DoesNotExist:
+        return _err("Impresora no encontrada", 404)
+    except Consumible.DoesNotExist:
+        return _err("Consumible no encontrado", 404)
+    if p.consumibles.filter(consumible=c).exists():
+        return _err("Esa impresora ya tiene ese consumible")
+    ImpresoraConsumible.objects.create(impresora=p, consumible=c, pieza=c.modelo, tipo_consumible=c.descripcion)
+    return JsonResponse(_impresora(p), status=201)
+
+
+@require_http_methods(["DELETE"])
+def impresora_linea_detalle(request, pk):
+    borradas, _detalle = ImpresoraConsumible.objects.filter(pk=pk).delete()
+    if not borradas:
+        return _err("Línea no encontrada", 404)
+    return JsonResponse({"ok": True})
 
 
 @require_GET

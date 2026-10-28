@@ -49,21 +49,16 @@ export default function App() {
   return (
     <>
       <header className="topbar">
-        <div className="topbar-inner">
-          <img src="/static/logo_tollocan.png" alt="Grupo Tollocan" className="logo" />
-          <h1>Control de consumibles</h1>
-        </div>
-      </header>
-
-      <nav className="tabs">
-        <div className="tabs-inner">
+        <img src="/static/logo_tollocan.png" alt="Grupo Tollocan" className="logo" />
+        <h1>Control de consumibles</h1>
+        <nav className="tabs">
           {TABS.map((t) => (
             <button key={t} className={t === tab ? 'active' : ''} onClick={() => setTab(t)}>
               {t}{t === 'Inventario' && bajos > 0 && <span className="badge">{bajos}</span>}
             </button>
           ))}
-        </div>
-      </nav>
+        </nav>
+      </header>
 
       <div className="app">
 
@@ -83,7 +78,10 @@ export default function App() {
         {tab === 'Inventario' && (
           <Stock consumables={consumables} onChange={reload} onMover={entregar} onRecibir={recibir} />
         )}
-        {tab === 'Impresoras' && <Impresoras printers={printers} onEntregar={entregar} />}
+        {tab === 'Impresoras' && (
+          <Impresoras printers={printers} consumables={consumables} departamentos={departamentos}
+            onEntregar={entregar} onChange={reload} />
+        )}
       </main>
       </div>
     </>
