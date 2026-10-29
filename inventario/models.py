@@ -1,7 +1,28 @@
 from django.conf import settings
+from django.contrib.auth.hashers import make_password
+from django.contrib.auth.models import AbstractUser, UserManager
 from django.db import models
 from django.utils import timezone
 
+class UsuarioManager(UserManager):
+    def _create_user(self, username, email=None, password=None, **extra_fields):
+        if not username:
+            raise ValueError("El usuario es obligatorio")
+        user = self.model(username=self.model.normalize_username(username), **extra_fields)
+        user.password = make_password(password)
+        user.save(using=self._db)
+        return user
+
+
+class Usuario(AbstractUser):
+    email = None
+    REQUIRED_FIELDS = []
+
+    objects = UsuarioManager()
+
+    class Meta:
+        verbose_name = "usuario"
+        verbose_name_plural = "usuarios"
 
 class Consumible(models.Model):
     modelo = models.CharField(max_length=200, unique=True)
@@ -98,6 +119,8 @@ class Actividad(models.Model):
         ("impresora_baja", "Impresora eliminada"),
         ("linea_alta", "Consumible agregado a impresora"),
         ("linea_baja", "Consumible quitado de impresora"),
+        ("usuario_alta", "Usuario creado"),
+        ("usuario_edicion", "Usuario editado"),
     ]
 
     fecha = models.DateTimeField(default=timezone.now, db_index=True)

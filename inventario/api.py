@@ -1,14 +1,15 @@
 import json
+from functools import wraps
 
 from django.conf import settings
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import authenticate, get_user_model, login, logout, update_session_auth_hash
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from . import auditoria, services
-from .models import Consumible, Impresora, ImpresoraConsumible, Movimiento
+from .models import Actividad, Consumible, Impresora, ImpresoraConsumible, Movimiento
 
 
 def _err(msg, status=400):
@@ -62,7 +63,23 @@ def _impresora(p):
 
 
 def _usuario(u):
-    return {"username": u.get_username(), "nombre": u.get_full_name() or u.get_username()}
+    return {"username": u.get_username(), "nombre": u.get_full_name() or u.get_username(),
+            "es_admin": u.is_staff}
+
+
+def _usuario_admin(u):
+    return {"id": u.pk, "username": u.get_username(), "nombre": u.first_name,
+            "es_admin": u.is_staff, "activo": u.is_active,
+            "ultimo_acceso": timezone.localtime(u.last_login).strftime("%Y-%m-%d %H:%M") if u.last_login else ""}
+
+
+def solo_admin(vista):
+    @wraps(vista)
+    def envuelta(request, *args, **kwargs):
+        if not request.user.is_staff:
+            return _err("Solo el encargado puede hacer esto", 403)
+        return vista(request, *args, **kwargs)
+    return envuelta
 
 
 @ensure_csrf_cookie
@@ -272,6 +289,83 @@ def anular(request, pk):
     except services.ErrorInventario as e:
         return _err(str(e))
     return JsonResponse(_mov(m))
+
+@require_http_methods(["GET", "POST"])
+@solo_admin
+def usuarios(request):
+    User = get_user_model()
+    if request.method == "GET":
+        return JsonResponse([_usuario_admin(u) for u in User.objects.order_by("-is_staff", "username")], safe=False)
+    d = _body(request)
+    username = _txt(d, "username")
+    password = str(d.get("password") or "")
+    if not username:
+        return _err("El usuario es obligatorio")
+    if len(username) > 150:
+        return _err("El usuario es demasiado largo")
+    if len(password) < 6:
+        return _err("La contraseña debe tener al menos 6 caracteres")
+    if User.objects.filter(username__iexact=username).exists():
+        return _err(f"Ya existe el usuario '{username}'")
+    u = User.objects.create_user(username=username, password=password,
+                                 first_name=_txt(d, "nombre")[:150], is_staff=bool(d.get("es_admin")))
+    rol = "encargado" if u.is_staff else "becario"
+    auditoria.registrar("usuario_alta", usuario=request.user, detalle=f"{u.username} ({rol})")
+    return JsonResponse(_usuario_admin(u), status=201)
+
+
+@require_http_methods(["PUT"])
+@solo_admin
+def usuario_detalle(request, pk):
+    User = get_user_model()
+    try:
+        u = User.objects.get(pk=pk)
+    except User.DoesNotExist:
+        return _err("Usuario no encontrado", 404)
+    d = _body(request)
+    propio = u.pk == request.user.pk
+    cambios = []
+    if "activo" in d:
+        if propio and not d["activo"]:
+            return _err("No puedes desactivar tu propio usuario")
+        u.is_active = bool(d["activo"])
+        cambios.append("activado" if u.is_active else "desactivado")
+    if "es_admin" in d:
+        if propio and not d["es_admin"]:
+            return _err("No puedes quitarte el rol de encargado")
+        u.is_staff = bool(d["es_admin"])
+        cambios.append("ahora encargado" if u.is_staff else "ahora becario")
+    if "nombre" in d:
+        u.first_name = _txt(d, "nombre")[:150]
+        cambios.append("nombre")
+    if d.get("password"):
+        nueva = str(d["password"])
+        if len(nueva) < 6:
+            return _err("La contraseña debe tener al menos 6 caracteres")
+        u.set_password(nueva)
+        cambios.append("contraseña nueva")
+    u.save()
+    if propio and d.get("password"):
+        update_session_auth_hash(request, u)
+    auditoria.registrar("usuario_edicion", usuario=request.user,
+                        detalle=f"{u.username}: {', '.join(cambios) or 'sin cambios'}")
+    return JsonResponse(_usuario_admin(u))
+
+
+@require_GET
+@solo_admin
+def actividad(request):
+    qs = Actividad.objects.all()
+    usuario = request.GET.get("usuario", "").strip()
+    accion = request.GET.get("accion", "").strip()
+    if usuario:
+        qs = qs.filter(username=usuario)
+    if accion:
+        qs = qs.filter(accion=accion)
+    return JsonResponse([{
+        "id": a.pk, "fecha": timezone.localtime(a.fecha).strftime("%Y-%m-%d %H:%M"),
+        "username": a.username, "accion": a.accion, "accion_texto": a.get_accion_display(),
+        "detalle": a.detalle, "ip": a.ip or ""} for a in qs[:300]], safe=False)
 
 
 DIST = settings.BASE_DIR / "frontend" / "dist"

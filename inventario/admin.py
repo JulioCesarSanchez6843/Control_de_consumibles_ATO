@@ -1,6 +1,7 @@
 from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin
 
-from .models import Actividad, Consumible, Impresora, ImpresoraConsumible, Movimiento
+from .models import Actividad, Consumible, Impresora, ImpresoraConsumible, Movimiento, Usuario, Usuario
 
 
 @admin.register(Consumible)
@@ -46,3 +47,14 @@ class ActividadAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+@admin.register(Usuario)
+class UsuarioAdmin(UserAdmin):
+    fieldsets = (
+        (None, {"fields": ("username", "password")}),
+        ("Datos", {"fields": ("first_name", "last_name")}),
+        ("Permisos", {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")}),
+        ("Fechas", {"fields": ("last_login", "date_joined")}),
+    )
+    list_display = ("username", "first_name", "last_name", "is_staff", "is_active")
+    search_fields = ("username", "first_name", "last_name")

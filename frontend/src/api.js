@@ -39,4 +39,8 @@ export const api = {
   movements: () => req('/movements'),
   addMovement: (d) => req('/movements', { method: 'POST', body: JSON.stringify(d) }),
   anular: (id) => req(`/movements/${id}/anular`, { method: 'POST' }),
+  usuarios: () => req('/users'),
+  addUsuario: (d) => req('/users', { method: 'POST', body: JSON.stringify(d) }),
+  updateUsuario: (id, d) => req(`/users/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+  actividad: (params) => req('/activity?' + new URLSearchParams(params).toString()),
 }

@@ -5,6 +5,7 @@ import Entradas from './components/Entradas'
 import Stock from './components/Stock'
 import Impresoras from './components/Impresoras'
 import Login from './components/Login'
+import Usuarios from './components/Usuarios'
 
 const TABS = ['Salidas', 'Entradas', 'Inventario', 'Impresoras']
 
@@ -70,9 +71,10 @@ export default function App() {
   }
 
   const bajos = consumables.filter((c) => c.stock <= c.stock_minimo).length
+  const tabs = usuario?.es_admin ? [...TABS, 'Usuarios'] : TABS
 
   if (!sesionLista) return <div className="cargando">Cargando…</div>
-  if (!usuario) return <Login onLogin={setUsuario} />
+  if (!usuario) return <Login onLogin={(u) => { setTab('Salidas'); setUsuario(u) }} />
 
   return (
     <>
@@ -80,14 +82,14 @@ export default function App() {
         <img src="/static/logo_tollocan.png" alt="Grupo Tollocan" className="logo" />
         <h1>Control de consumibles</h1>
         <nav className="tabs">
-          {TABS.map((t) => (
+          {tabs.map((t) => (
             <button key={t} className={t === tab ? 'active' : ''} onClick={() => setTab(t)}>
               {t}{t === 'Inventario' && bajos > 0 && <span className="badge">{bajos}</span>}
             </button>
           ))}
         </nav>
         <div className="usuario">
-          <span>{usuario.nombre}</span>
+          <span>{usuario.nombre} ({usuario.es_admin ? 'Encargado' : 'Becario'})</span>
           <button className="link" onClick={salir}>Salir</button>
         </div>
       </header>
@@ -114,6 +116,7 @@ export default function App() {
           <Impresoras printers={printers} consumables={consumables} departamentos={departamentos}
             onEntregar={entregar} onChange={reload} />
         )}
+        {tab === 'Usuarios' && usuario.es_admin && <Usuarios usuarioActual={usuario} />}
       </main>
       </div>
     </>
