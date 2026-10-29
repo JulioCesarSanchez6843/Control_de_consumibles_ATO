@@ -27,6 +27,7 @@
   --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 8px 24px rgba(0, 0, 0, .35);
   --shadow-lg: 0 8px 28px rgba(0, 0, 0, .55);
   --nav-h: 68px;
+  --sub-h: 46px;
 }
 
 * { box-sizing: border-box; scrollbar-width: thin; scrollbar-color: #3b3b45 transparent; }
@@ -124,6 +125,12 @@ tbody tr.fila.agotado td:first-child { box-shadow: inset 3px 0 0 var(--primary);
 
 .hint { font-size: .8rem; color: var(--text-muted); margin: -6px 0 10px; }
 .hint.warn { color: var(--danger-text); font-weight: 600; }
+
+.subnav { position: sticky; top: var(--nav-h); z-index: 15; display: flex; align-items: stretch; gap: 4px; padding: 0 28px; min-height: var(--sub-h); overflow-x: auto; background: #0d0d10; border-bottom: 1px solid var(--border); box-shadow: 0 6px 18px rgba(0, 0, 0, .35); animation: entrar .22s ease backwards; }
+.subnav button { display: flex; align-items: center; gap: 8px; padding: 0 16px; background: none; border: none; border-bottom: 3px solid transparent; color: var(--text-soft); font: inherit; font-size: .88rem; font-weight: 500; white-space: nowrap; cursor: pointer; transition: color .15s, background .15s, border-color .15s; }
+.subnav button:hover { color: #fff; background: rgba(255, 255, 255, .04); }
+.subnav button.active { color: #fff; font-weight: 600; border-bottom-color: var(--primary); background: linear-gradient(180deg, transparent, var(--primary-soft)); }
+.subnav button svg { flex: none; }
 
 .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
 .toolbar h2 { margin: 0; padding-left: 11px; border-left: 3px solid var(--primary); }
@@ -226,7 +233,7 @@ tbody tr.fila.agotado td:first-child { box-shadow: inset 3px 0 0 var(--primary);
 .split.cerrado { grid-template-columns: 56px minmax(0, 1fr); }
 .split-main { margin: 22px 24px 40px; min-width: 0; }
 
-.side { position: sticky; top: var(--nav-h); height: calc(100vh - var(--nav-h)); display: flex; flex-direction: column; background: var(--surface); border-right: 1px solid var(--border); box-shadow: 6px 0 24px rgba(0, 0, 0, .45); overflow: hidden; }
+.side { position: sticky; top: calc(var(--nav-h) + var(--sub-h)); height: calc(100vh - var(--nav-h) - var(--sub-h)); display: flex; flex-direction: column; background: var(--surface); border-right: 1px solid var(--border); box-shadow: 6px 0 24px rgba(0, 0, 0, .45); overflow: hidden; }
 .side-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 10px 0 18px; min-height: 52px; flex: none; background: linear-gradient(135deg, #0b0b0e 0%, #1a1a20 100%); border-bottom: 2px solid var(--primary); color: #fff; }
 .side-titulo { font-weight: 700; font-size: .95rem; letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .side-btn { flex: none; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, .06); color: #fff; border: 1px solid rgba(255, 255, 255, .2); border-radius: 8px; cursor: pointer; transition: background .15s, border-color .15s; }
@@ -239,7 +246,7 @@ tbody tr.fila.agotado td:first-child { box-shadow: inset 3px 0 0 var(--primary);
 .split.cerrado .side-rail { display: block; }
 .form-op h2 { margin-top: 0; }
 
-.tabla-scroll { overflow: auto; max-height: calc(100vh - 250px); border: 1px solid var(--border-strong); border-radius: 10px; background: var(--surface); }
+.tabla-scroll { overflow: auto; max-height: calc(100vh - 300px); border: 1px solid var(--border-strong); border-radius: 10px; background: var(--surface); }
 .excel thead th { position: sticky; top: 0; z-index: 2; }
 .excel td.id { background: var(--header); color: var(--text-muted); font-weight: 600; text-align: center; width: 1%; }
 .excel td.nota { white-space: normal; min-width: 180px; max-width: 320px; }
@@ -254,6 +261,7 @@ tbody tr.fila.agotado td:first-child { box-shadow: inset 3px 0 0 var(--primary);
   .marca-texto span { display: none; }
   .usuario-datos { display: none; }
   .tabs { order: 3; flex: 1 0 100%; overflow-x: auto; }
+  .subnav { position: static; padding: 0 10px; }
 }
 
 @media (max-width: 800px) {

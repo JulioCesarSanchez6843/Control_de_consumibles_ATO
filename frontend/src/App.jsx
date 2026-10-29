@@ -7,9 +7,15 @@ import Impresoras from './components/Impresoras'
 import Login from './components/Login'
 import Usuarios from './components/Usuarios'
 import Historial from './components/Historial'
-import { Boxes, History as IcoHistorial, LogOut, PackageMinus, PackagePlus, Printer, Users } from 'lucide-react'
+import { Boxes, ClipboardList, History as IcoHistorial, LogOut, PackageMinus, PackagePlus, Printer, ShieldCheck, Users, Warehouse } from 'lucide-react'
 
-const TABS = ['Salidas', 'Entradas', 'Inventario', 'Impresoras']
+const GRUPOS = [
+  { nombre: 'Bitácora', icono: ClipboardList, tabs: ['Salidas', 'Entradas'] },
+  { nombre: 'Inventarios', icono: Warehouse, tabs: ['Inventario', 'Impresoras'] },
+  { nombre: 'Equipo TI', icono: ShieldCheck, tabs: ['Usuarios', 'Historial'], admin: true },
+]
+
+const ETIQUETAS = { Inventario: 'Stock de consumibles' }
 
 const ICONOS = {
   Salidas: PackageMinus,
@@ -87,7 +93,8 @@ export default function App() {
   }
 
   const bajos = consumables.filter((c) => c.stock <= c.stock_minimo).length
-  const tabs = usuario?.es_admin ? [...TABS, 'Usuarios', 'Historial'] : TABS
+  const grupos = GRUPOS.filter((g) => !g.admin || usuario?.es_admin)
+  const grupo = grupos.find((g) => g.tabs.includes(tab)) || grupos[0]
 
   if (!sesionLista) return <div className="cargando"><span className="spinner" />Cargando…</div>
   if (!usuario) return <Login onLogin={(u) => { setTab('Salidas'); setUsuario(u) }} />
@@ -103,13 +110,18 @@ export default function App() {
           </div>
         </div>
         <nav className="tabs">
-          {tabs.map((t) => (
-            <button key={t} className={t === tab ? 'active' : ''} onClick={() => setTab(t)}>
-              <Ico t={t} />
-              <span>{t}</span>
-              {t === 'Inventario' && bajos > 0 && <span className="badge">{bajos}</span>}
-            </button>
-          ))}
+          {grupos.map((g) => {
+            const Icono = g.icono
+            const activo = g === grupo
+            return (
+              <button key={g.nombre} className={activo ? 'active' : ''}
+                onClick={() => { if (!activo) setTab(g.tabs[0]) }}>
+                <Icono size={17} strokeWidth={2.2} />
+                <span>{g.nombre}</span>
+                {g.tabs.includes('Inventario') && bajos > 0 && <span className="badge">{bajos}</span>}
+              </button>
+            )
+          })}
         </nav>
         <div className="usuario">
           <div className="avatar">{(usuario.nombre || usuario.username || '?').slice(0, 1).toUpperCase()}</div>
@@ -120,6 +132,16 @@ export default function App() {
           <button className="btn-salir" onClick={salir}><LogOut size={16} /> Salir</button>
         </div>
       </header>
+
+      <nav className="subnav" key={grupo.nombre}>
+        {grupo.tabs.map((t) => (
+          <button key={t} className={t === tab ? 'active' : ''} onClick={() => setTab(t)}>
+            <Ico t={t} />
+            <span>{ETIQUETAS[t] || t}</span>
+            {t === 'Inventario' && bajos > 0 && <span className="badge">{bajos}</span>}
+          </button>
+        ))}
+      </nav>
 
       <div className="app">
 
