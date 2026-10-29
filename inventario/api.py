@@ -39,8 +39,8 @@ def _txt(d, k):
 
 
 def _cons(c):
-    return {"id": c.pk, "modelo": c.modelo, "descripcion": c.descripcion, "marca": c.marca,
-            "notas": c.notas, "stock": c.stock, "stock_minimo": c.stock_minimo}
+    return {"id": c.pk, "modelo": c.modelo, "departamento": c.departamento, "descripcion": c.descripcion,
+            "marca": c.marca, "notas": c.notas, "stock": c.stock, "stock_minimo": c.stock_minimo}
 
 
 def _mov(m):
@@ -135,18 +135,22 @@ def consumibles(request):
         return JsonResponse([_cons(c) for c in Consumible.objects.all()], safe=False)
     d = _body(request)
     modelo = _txt(d, "modelo")
+    departamento = _txt(d, "departamento")
     if not modelo:
         return _err("El modelo es obligatorio")
-    if Consumible.objects.filter(modelo__iexact=modelo).exists():
-        return _err(f"Ya existe un consumible con el modelo '{modelo}'")
+    if not departamento:
+        return _err("El departamento es obligatorio")
+    if Consumible.objects.filter(modelo__iexact=modelo, departamento__iexact=departamento).exists():
+        return _err(f"'{departamento}' ya tiene un consumible con el modelo '{modelo}'")
     try:
         c = Consumible.objects.create(
-            modelo=modelo, descripcion=_txt(d, "descripcion"), marca=_txt(d, "marca"), notas=_txt(d, "notas"),
+            modelo=modelo, departamento=departamento, descripcion=_txt(d, "descripcion"),
+            marca=_txt(d, "marca"), notas=_txt(d, "notas"),
             stock=_entero(d.get("stock", 0), "El stock"), stock_minimo=_entero(d.get("stock_minimo", 1), "El mínimo"))
     except ValueError as e:
         return _err(str(e))
     auditoria.registrar("consumible_alta", usuario=request.user,
-                        detalle=f"{c.modelo} (stock inicial {c.stock}, mínimo {c.stock_minimo})")
+                        detalle=f"{c.departamento}: {c.modelo} (stock inicial {c.stock}, mínimo {c.stock_minimo})")
     return JsonResponse(_cons(c), status=201)
 
 
@@ -158,15 +162,21 @@ def consumible_detalle(request, pk):
         return _err("Consumible no encontrado", 404)
     d = _body(request)
     try:
-        for campo in ("descripcion", "marca", "notas"):
+        for campo in ("departamento", "descripcion", "marca", "notas"):
             if campo in d:
                 setattr(c, campo, _txt(d, campo))
+        if "departamento" in d:
+            if not c.departamento:
+                raise ValueError("El departamento es obligatorio")
+            if Consumible.objects.filter(
+                    modelo__iexact=c.modelo, departamento__iexact=c.departamento).exclude(pk=c.pk).exists():
+                raise ValueError(f"'{c.departamento}' ya tiene un consumible con el modelo '{c.modelo}'")
         if "stock_minimo" in d:
             c.stock_minimo = _entero(d["stock_minimo"], "El mínimo")
     except ValueError as e:
         return _err(str(e))
     c.save()
-    cambios = ", ".join(f"{k}={_txt(d, k)}" for k in ("descripcion", "marca", "notas", "stock_minimo") if k in d)
+    cambios = ", ".join(f"{k}={_txt(d, k)}" for k in ("departamento", "descripcion", "marca", "notas", "stock_minimo") if k in d)
     auditoria.registrar("consumible_edicion", usuario=request.user, detalle=f"{c.modelo}: {cambios}")
     return JsonResponse(_cons(c))
 
@@ -229,6 +239,8 @@ def impresora_linea_nueva(request, pk):
         return _err("Impresora no encontrada", 404)
     except Consumible.DoesNotExist:
         return _err("Consumible no encontrado", 404)
+    if c.departamento.strip().lower() != p.departamento.strip().lower():
+        return _err(f"Ese consumible es de '{c.departamento or 'sin departamento'}' y la impresora es de '{p.departamento}'")
     if p.consumibles.filter(consumible=c).exists():
         return _err("Esa impresora ya tiene ese consumible")
     ImpresoraConsumible.objects.create(impresora=p, consumible=c, pieza=c.modelo, tipo_consumible=c.descripcion)
@@ -253,7 +265,8 @@ def impresora_linea_detalle(request, pk):
 def departamentos(request):
     a = Impresora.objects.exclude(departamento="").values_list("departamento", flat=True)
     b = Movimiento.objects.exclude(departamento="").values_list("departamento", flat=True)
-    return JsonResponse(sorted({d.strip() for d in list(a) + list(b)}, key=str.lower), safe=False)
+    c = Consumible.objects.exclude(departamento="").values_list("departamento", flat=True)
+    return JsonResponse(sorted({d.strip() for d in list(a) + list(b) + list(c)}, key=str.lower), safe=False)
 
 
 @require_http_methods(["GET", "POST"])
@@ -269,7 +282,7 @@ def movimientos(request):
         cantidad = _entero(d.get("cantidad"), "La cantidad", minimo=1)
         consumible = Consumible.objects.get(pk=_entero(d.get("consumable_id"), "El consumible", minimo=1))
         m = services.registrar_salida(
-            consumible=consumible, cantidad=cantidad, departamento=_txt(d, "departamento"),
+            consumible=consumible, cantidad=cantidad,
             persona=_txt(d, "persona"), notas=_txt(d, "notas"), usuario=request.user)
     except ValueError as e:
         return _err(str(e))

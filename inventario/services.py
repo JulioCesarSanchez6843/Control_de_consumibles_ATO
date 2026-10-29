@@ -9,11 +9,11 @@ class ErrorInventario(Exception):
 
 
 @transaction.atomic
-def registrar_salida(*, consumible, cantidad, departamento="", persona="", notas="", usuario=None):
+def registrar_salida(*, consumible, cantidad, persona="", notas="", usuario=None):
     c = Consumible.objects.select_for_update().get(pk=consumible.pk)
-    departamento = (departamento or "").strip()
+    departamento = c.departamento.strip()
     if not departamento:
-        raise ErrorInventario("Indica a qué departamento se entrega el consumible.")
+        raise ErrorInventario(f"El consumible {c.modelo} no tiene departamento asignado.")
     nuevo = c.stock - cantidad
     if nuevo < 0:
         raise ErrorInventario(f"Stock insuficiente de {c.modelo}: hay {c.stock} y pides {cantidad}.")
@@ -34,11 +34,11 @@ def agregar_stock(pk, cantidad, proveedor="", notas="", usuario=None):
     c.stock += cantidad
     c.save(update_fields=["stock"])
     m = Movimiento.objects.create(
-        consumible=c, tipo=Movimiento.ENTRADA, cantidad=cantidad,
+        consumible=c, tipo=Movimiento.ENTRADA, cantidad=cantidad, departamento=c.departamento,
         persona=(proveedor or "").strip(), notas=(notas or "").strip(), usuario=usuario)
     auditoria.registrar(
         "entrada", usuario=usuario, movimiento=m,
-        detalle=f"{cantidad} x {c.modelo}" + (f" de {m.persona}" if m.persona else ""))
+        detalle=f"{cantidad} x {c.modelo} en {c.departamento}" + (f" de {m.persona}" if m.persona else ""))
     return m
 
 

@@ -25,7 +25,8 @@ class Usuario(AbstractUser):
         verbose_name_plural = "usuarios"
 
 class Consumible(models.Model):
-    modelo = models.CharField(max_length=200, unique=True)
+    modelo = models.CharField(max_length=200)
+    departamento = models.CharField(max_length=100, blank=True, default="")
     descripcion = models.CharField("descripción", max_length=100, blank=True)
     marca = models.CharField(max_length=100, blank=True)
     notas = models.CharField(max_length=300, blank=True)
@@ -33,12 +34,15 @@ class Consumible(models.Model):
     stock_minimo = models.PositiveIntegerField("stock mínimo", default=1)
 
     class Meta:
-        ordering = ["descripcion", "modelo"]
+        ordering = ["departamento", "descripcion", "modelo"]
+        constraints = [
+            models.UniqueConstraint(fields=["departamento", "modelo"], name="consumible_unico_por_departamento"),
+        ]
         verbose_name = "consumible"
         verbose_name_plural = "consumibles"
 
     def __str__(self):
-        return f"{self.modelo} ({self.descripcion})"
+        return f"{self.modelo} ({self.descripcion}) - {self.departamento}"
 
     @property
     def estado(self):

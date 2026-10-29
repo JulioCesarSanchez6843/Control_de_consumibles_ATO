@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
 
-const NUEVO = { modelo: '', descripcion: '', marca: '', stock: 0, stock_minimo: 1 }
+const NUEVO = { departamento: '', modelo: '', descripcion: '', marca: '', stock: 0, stock_minimo: 1 }
 
-export default function ConsumibleModal({ onClose, onCreated }) {
+export default function ConsumibleModal({ onClose, onCreated, departamentos }) {
   const [f, setF] = useState(NUEVO)
   const [err, setErr] = useState('')
   const [enviando, setEnviando] = useState(false)
@@ -41,8 +41,16 @@ export default function ConsumibleModal({ onClose, onCreated }) {
           <button type="button" className="modal-cerrar" onClick={onClose} aria-label="Cerrar">×</button>
         </div>
 
+        <label>Departamento
+          <input list="deptos-consumible" value={f.departamento} onChange={set('departamento')}
+            required autoFocus autoComplete="off" />
+        </label>
+        <datalist id="deptos-consumible">
+          {departamentos.map((x) => <option key={x} value={x} />)}
+        </datalist>
+
         <label>Modelo
-          <input value={f.modelo} onChange={set('modelo')} required autoFocus
+          <input value={f.modelo} onChange={set('modelo')} required 
             placeholder="Ej. TN850" autoComplete="off" />
         </label>
         <div className="fila-2">

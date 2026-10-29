@@ -57,7 +57,8 @@ export default function Impresoras({ printers, consumables, departamentos, onEnt
                     {' '}<button className="link" onClick={() => quitarLinea(l.id)}>Quitar</button>
                   </div>
                 ))}
-                <LineaNueva impresoraId={p.id} consumables={consumables} onGuardado={onChange} onError={setErr} />
+                <LineaNueva impresoraId={p.id} departamento={p.departamento} consumables={consumables}
+                  onGuardado={onChange} onError={setErr} />
               </td>
               <td className="acciones">
                 <button className="link" onClick={() => setForm(p)}>Editar</button>

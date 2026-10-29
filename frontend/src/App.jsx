@@ -7,8 +7,23 @@ import Impresoras from './components/Impresoras'
 import Login from './components/Login'
 import Usuarios from './components/Usuarios'
 import Historial from './components/Historial'
+import { Boxes, History as IcoHistorial, LogOut, PackageMinus, PackagePlus, Printer, Users } from 'lucide-react'
 
 const TABS = ['Salidas', 'Entradas', 'Inventario', 'Impresoras']
+
+const ICONOS = {
+  Salidas: PackageMinus,
+  Entradas: PackagePlus,
+  Inventario: Boxes,
+  Impresoras: Printer,
+  Usuarios: Users,
+  Historial: IcoHistorial,
+}
+
+function Ico({ t }) {
+  const Icono = ICONOS[t]
+  return <Icono size={17} strokeWidth={2.2} />
+}
 
 export default function App() {
   const [tab, setTab] = useState('Salidas')
@@ -74,7 +89,7 @@ export default function App() {
   const bajos = consumables.filter((c) => c.stock <= c.stock_minimo).length
   const tabs = usuario?.es_admin ? [...TABS, 'Usuarios', 'Historial'] : TABS
 
-  if (!sesionLista) return <div className="cargando">Cargando…</div>
+  if (!sesionLista) return <div className="cargando"><span className="spinner" />Cargando…</div>
   if (!usuario) return <Login onLogin={(u) => { setTab('Salidas'); setUsuario(u) }} />
 
   return (
@@ -90,7 +105,9 @@ export default function App() {
         <nav className="tabs">
           {tabs.map((t) => (
             <button key={t} className={t === tab ? 'active' : ''} onClick={() => setTab(t)}>
-              {t}{t === 'Inventario' && bajos > 0 && <span className="badge">{bajos}</span>}
+              <Ico t={t} />
+              <span>{t}</span>
+              {t === 'Inventario' && bajos > 0 && <span className="badge">{bajos}</span>}
             </button>
           ))}
         </nav>
@@ -100,7 +117,7 @@ export default function App() {
             <strong>{usuario.nombre || usuario.username}</strong>
             <span>{usuario.es_admin ? 'Encargado' : 'Becario'}</span>
           </div>
-          <button className="btn-salir" onClick={salir}>Salir</button>
+          <button className="btn-salir" onClick={salir}><LogOut size={16} /> Salir</button>
         </div>
       </header>
 
@@ -109,9 +126,9 @@ export default function App() {
       {error && (
         <div className="alert error">{error} <button className="link" onClick={reload}>Reintentar</button></div>
       )}
-      {cargando && <div className="cargando">Cargando datos…</div>}
+      {cargando && <div className="cargando"><span className="spinner" />Cargando datos…</div>}
 
-      <main hidden={cargando}>
+      <main key={tab} hidden={cargando} className="vista">
         {tab === 'Salidas' && (
           <Salidas consumables={consumables} departamentos={departamentos} printers={printers}
             movements={movements} prefill={prefill} onDone={reload} />
@@ -120,7 +137,8 @@ export default function App() {
           <Entradas consumables={consumables} movements={movements} prefill={prefillEntrada} onDone={reload} />
         )}
         {tab === 'Inventario' && (
-          <Stock consumables={consumables} onChange={reload} onMover={entregar} onRecibir={recibir} />
+            <Stock consumables={consumables} departamentos={departamentos} onChange={reload}
+            onMover={entregar} onRecibir={recibir} />
         )}
         {tab === 'Impresoras' && (
           <Impresoras printers={printers} consumables={consumables} departamentos={departamentos}

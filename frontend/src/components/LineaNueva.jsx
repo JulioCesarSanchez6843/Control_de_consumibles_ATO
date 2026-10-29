@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { api } from '../api'
 
-export default function LineaNueva({ impresoraId, consumables, onGuardado, onError }) {
+export default function LineaNueva({ impresoraId, departamento, consumables, onGuardado, onError }) {
   const [abierto, setAbierto] = useState(false)
   const [id, setId] = useState('')
 
@@ -21,7 +21,7 @@ export default function LineaNueva({ impresoraId, consumables, onGuardado, onErr
     <div className="linea-nueva">
       <select value={id} onChange={(e) => setId(e.target.value)}>
         <option value="">Elegir consumible…</option>
-        {consumables.map((c) => (
+        {consumables.filter((c) => c.departamento.trim().toLowerCase() === departamento.trim().toLowerCase()).map((c) => (
           <option key={c.id} value={c.id}>{c.modelo}{c.descripcion ? ` · ${c.descripcion}` : ''}</option>
         ))}
       </select>
