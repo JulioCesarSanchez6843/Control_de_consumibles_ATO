@@ -1,13 +1,13 @@
-"""API JSON que consume el React. Mismas reglas de stock que services.py."""
 import json
 
 from django.conf import settings
+from django.contrib.auth import authenticate, login, logout
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
-from . import services
+from . import auditoria, services
 from .models import Consumible, Impresora, ImpresoraConsumible, Movimiento
 
 
@@ -37,7 +37,6 @@ def _txt(d, k):
     return str(d.get(k) or "").strip()
 
 
-# ---------- serializadores ----------
 def _cons(c):
     return {"id": c.pk, "modelo": c.modelo, "descripcion": c.descripcion, "marca": c.marca,
             "notas": c.notas, "stock": c.stock, "stock_minimo": c.stock_minimo}
@@ -48,7 +47,9 @@ def _mov(m):
             "consumable_id": m.consumible_id, "cantidad": m.cantidad, "departamento": m.departamento,
             "persona": m.persona, "notas": m.notas, "anulado": m.anulado,
             "modelo": m.consumible.modelo, "descripcion": m.consumible.descripcion,
-            "stock_actual": m.consumible.stock}
+            "stock_actual": m.consumible.stock,
+            "usuario": m.usuario.get_username() if m.usuario else "",
+            "anulado_por": m.anulado_por.get_username() if m.anulado_por else ""}
 
 
 def _impresora(p):
@@ -60,23 +61,56 @@ def _impresora(p):
             } for ln in p.consumibles.all()]}
 
 
-# ---------- rutas ----------
+def _usuario(u):
+    return {"username": u.get_username(), "nombre": u.get_full_name() or u.get_username()}
+
+
 @ensure_csrf_cookie
 @require_GET
 def csrf(request):
     return JsonResponse({"ok": True})
+
+
+@require_GET
+def me(request):
+    if not request.user.is_authenticated:
+        return _err("No has iniciado sesión", 401)
+    return JsonResponse(_usuario(request.user))
+
+
+@require_POST
+def entrar(request):
+    d = _body(request)
+    user = authenticate(request, username=_txt(d, "username"), password=str(d.get("password") or ""))
+    if user is None:
+        auditoria.registrar("login_fallido", username=_txt(d, "username")[:150], request=request)
+        return _err("Usuario o contraseña incorrectos", 401)
+    login(request, user)
+    auditoria.registrar("login", usuario=user, request=request)
+    return JsonResponse(_usuario(user))
+
+
+@require_POST
+def salir(request):
+    if request.user.is_authenticated:
+        auditoria.registrar("logout", usuario=request.user, request=request)
+    logout(request)
+    return JsonResponse({"ok": True})
+
 
 @require_POST
 def agregar_stock(request, pk):
     d = _body(request)
     try:
         cantidad = _entero(d.get("cantidad"), "La cantidad", minimo=1)
-        m = services.agregar_stock(pk, cantidad, proveedor=_txt(d, "proveedor"), notas=_txt(d, "notas"))
+        m = services.agregar_stock(pk, cantidad, proveedor=_txt(d, "proveedor"), notas=_txt(d, "notas"),
+                                   usuario=request.user)
     except ValueError as e:
         return _err(str(e))
     except Consumible.DoesNotExist:
         return _err("Consumible no encontrado", 404)
     return JsonResponse(_mov(m), status=201)
+
 
 @require_http_methods(["GET", "POST"])
 def consumibles(request):
@@ -94,6 +128,8 @@ def consumibles(request):
             stock=_entero(d.get("stock", 0), "El stock"), stock_minimo=_entero(d.get("stock_minimo", 1), "El mínimo"))
     except ValueError as e:
         return _err(str(e))
+    auditoria.registrar("consumible_alta", usuario=request.user,
+                        detalle=f"{c.modelo} (stock inicial {c.stock}, mínimo {c.stock_minimo})")
     return JsonResponse(_cons(c), status=201)
 
 
@@ -103,7 +139,7 @@ def consumible_detalle(request, pk):
         c = Consumible.objects.get(pk=pk)
     except Consumible.DoesNotExist:
         return _err("Consumible no encontrado", 404)
-    d = _body(request)  # el stock NO se edita aquí: solo cambia con movimientos
+    d = _body(request)
     try:
         for campo in ("descripcion", "marca", "notas"):
             if campo in d:
@@ -113,6 +149,8 @@ def consumible_detalle(request, pk):
     except ValueError as e:
         return _err(str(e))
     c.save()
+    cambios = ", ".join(f"{k}={_txt(d, k)}" for k in ("descripcion", "marca", "notas", "stock_minimo") if k in d)
+    auditoria.registrar("consumible_edicion", usuario=request.user, detalle=f"{c.modelo}: {cambios}")
     return JsonResponse(_cons(c))
 
 
@@ -132,6 +170,8 @@ def impresoras(request):
         return JsonResponse([_impresora(p) for p in qs], safe=False)
     try:
         p = Impresora.objects.create(**_datos_impresora(_body(request)))
+        auditoria.registrar("impresora_alta", usuario=request.user,
+                            detalle=f"{p.departamento}: {p.marca} {p.modelo}")
     except ValueError as e:
         return _err(str(e))
     return JsonResponse(_impresora(p), status=201)
@@ -144,7 +184,9 @@ def impresora_detalle(request, pk):
     except Impresora.DoesNotExist:
         return _err("Impresora no encontrada", 404)
     if request.method == "DELETE":
+        detalle = f"{p.departamento}: {p.marca} {p.modelo}"
         p.delete()
+        auditoria.registrar("impresora_baja", usuario=request.user, detalle=detalle)
         return JsonResponse({"ok": True})
     try:
         datos = _datos_impresora(_body(request))
@@ -153,6 +195,8 @@ def impresora_detalle(request, pk):
     for campo, valor in datos.items():
         setattr(p, campo, valor)
     p.save()
+    auditoria.registrar("impresora_edicion", usuario=request.user,
+                        detalle=f"{p.departamento}: {p.marca} {p.modelo}")
     return JsonResponse(_impresora(p))
 
 
@@ -171,14 +215,20 @@ def impresora_linea_nueva(request, pk):
     if p.consumibles.filter(consumible=c).exists():
         return _err("Esa impresora ya tiene ese consumible")
     ImpresoraConsumible.objects.create(impresora=p, consumible=c, pieza=c.modelo, tipo_consumible=c.descripcion)
+    auditoria.registrar("linea_alta", usuario=request.user,
+                        detalle=f"{c.modelo} a {p.departamento}: {p.marca} {p.modelo}")
     return JsonResponse(_impresora(p), status=201)
 
 
 @require_http_methods(["DELETE"])
 def impresora_linea_detalle(request, pk):
+    linea = ImpresoraConsumible.objects.select_related("impresora").filter(pk=pk).first()
     borradas, _detalle = ImpresoraConsumible.objects.filter(pk=pk).delete()
     if not borradas:
         return _err("Línea no encontrada", 404)
+    auditoria.registrar("linea_baja", usuario=request.user,
+                        detalle=f"{linea.pieza} de {linea.impresora.departamento}: "
+                                f"{linea.impresora.marca} {linea.impresora.modelo}")
     return JsonResponse({"ok": True})
 
 
@@ -192,7 +242,7 @@ def departamentos(request):
 @require_http_methods(["GET", "POST"])
 def movimientos(request):
     if request.method == "GET":
-        qs = Movimiento.objects.select_related("consumible")[:500]
+        qs = Movimiento.objects.select_related("consumible", "usuario", "anulado_por")[:500]
         return JsonResponse([_mov(m) for m in qs], safe=False)
     d = _body(request)
     tipo = d.get("tipo", Movimiento.SALIDA)
@@ -203,7 +253,7 @@ def movimientos(request):
         consumible = Consumible.objects.get(pk=_entero(d.get("consumable_id"), "El consumible", minimo=1))
         m = services.registrar_salida(
             consumible=consumible, cantidad=cantidad, departamento=_txt(d, "departamento"),
-            persona=_txt(d, "persona"), notas=_txt(d, "notas"))
+            persona=_txt(d, "persona"), notas=_txt(d, "notas"), usuario=request.user)
     except ValueError as e:
         return _err(str(e))
     except Consumible.DoesNotExist:
@@ -216,7 +266,7 @@ def movimientos(request):
 @require_POST
 def anular(request, pk):
     try:
-        m = services.anular_movimiento(pk)
+        m = services.anular_movimiento(pk, usuario=request.user)
     except Movimiento.DoesNotExist:
         return _err("Movimiento no encontrado", 404)
     except services.ErrorInventario as e:
@@ -224,7 +274,6 @@ def anular(request, pk):
     return JsonResponse(_mov(m))
 
 
-# ---------- sirve el React compilado ----------
 DIST = settings.BASE_DIR / "frontend" / "dist"
 
 SIN_COMPILAR = """<!doctype html><meta charset="utf-8"><title>Falta compilar</title>

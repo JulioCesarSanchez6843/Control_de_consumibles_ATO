@@ -46,7 +46,7 @@ export default function Salidas({ consumables, departamentos, printers, movement
     const t = q.trim().toLowerCase()
     return movements
       .filter((m) => m.tipo === 'salida')
-      .filter((m) => `${m.modelo} ${m.descripcion} ${m.departamento} ${m.persona} ${m.notas}`.toLowerCase().includes(t))
+      .filter((m) => `${m.modelo} ${m.descripcion} ${m.departamento} ${m.persona} ${m.usuario} ${m.notas}`.toLowerCase().includes(t))
   }, [movements, q])
 
   const cantidad = Number(f.cantidad)
@@ -156,18 +156,18 @@ export default function Salidas({ consumables, departamentos, printers, movement
         <table>
           <thead>
             <tr><th>Folio</th><th>Fecha</th><th>Modelo</th><th>Descripción</th><th>Cant.</th>
-              <th>Departamento</th><th>Persona</th><th>Notas</th><th></th></tr>
+              <th>Departamento</th><th>Persona</th><th>Notas</th><th>Registró</th><th></th></tr>
           </thead>
           <tbody>
             {salidas.map((m) => (
               <tr key={m.id} className={m.anulado ? 'muted' : ''}>
                 <td>{m.id}</td><td>{m.fecha}</td>
                 <td>{m.modelo}</td><td>{m.descripcion}</td><td>{m.cantidad}</td>
-                <td>{m.departamento}</td><td>{m.persona}</td><td>{m.notas}</td>
-                <td>{m.anulado ? <em>anulado</em> : <button className="link" onClick={() => anular(m)}>Anular</button>}</td>
+                <td>{m.departamento}</td><td>{m.persona}</td><td>{m.notas}</td><td>{m.usuario}</td>
+                <td>{m.anulado ? <em>anulado{m.anulado_por ? ` por ${m.anulado_por}` : ''}</em> : <button className="link" onClick={() => anular(m)}>Anular</button>}</td>
               </tr>
             ))}
-            {salidas.length === 0 && <tr><td colSpan="9">Sin salidas.</td></tr>}
+            {salidas.length === 0 && <tr><td colSpan="10">Sin salidas.</td></tr>}
           </tbody>
         </table>
       </div>

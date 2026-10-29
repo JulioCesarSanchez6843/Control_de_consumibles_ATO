@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
@@ -41,7 +42,6 @@ class Impresora(models.Model):
 
 
 class ImpresoraConsumible(models.Model):
-    """Qué consumibles usa cada impresora ."""
     impresora = models.ForeignKey(Impresora, on_delete=models.CASCADE, related_name="consumibles")
     tipo_consumible = models.CharField(max_length=100, blank=True)
     pieza = models.CharField(max_length=200, blank=True)
@@ -69,6 +69,10 @@ class Movimiento(models.Model):
     persona = models.CharField("quién recibe / proveedor", max_length=100, blank=True)
     notas = models.CharField(max_length=300, blank=True)
     anulado = models.BooleanField(default=False)
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT,
+                                related_name="movimientos_registrados")
+    anulado_por = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT,
+                                    related_name="movimientos_anulados")
 
     class Meta:
         ordering = ["-id"]
@@ -77,3 +81,39 @@ class Movimiento(models.Model):
 
     def __str__(self):
         return f"#{self.pk} {self.tipo} {self.cantidad} x {self.consumible.modelo}"
+
+
+class Actividad(models.Model):
+    ACCIONES = [
+        ("login", "Inicio de sesión"),
+        ("login_fallido", "Intento de sesión fallido"),
+        ("logout", "Cierre de sesión"),
+        ("salida", "Salida registrada"),
+        ("entrada", "Entrada registrada"),
+        ("anulacion", "Movimiento anulado"),
+        ("consumible_alta", "Consumible creado"),
+        ("consumible_edicion", "Consumible editado"),
+        ("impresora_alta", "Impresora creada"),
+        ("impresora_edicion", "Impresora editada"),
+        ("impresora_baja", "Impresora eliminada"),
+        ("linea_alta", "Consumible agregado a impresora"),
+        ("linea_baja", "Consumible quitado de impresora"),
+    ]
+
+    fecha = models.DateTimeField(default=timezone.now, db_index=True)
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT,
+                                related_name="actividad")
+    username = models.CharField("usuario", max_length=150, blank=True)
+    accion = models.CharField(max_length=30, choices=ACCIONES)
+    detalle = models.CharField(max_length=500, blank=True)
+    movimiento = models.ForeignKey(Movimiento, null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name="actividad")
+    ip = models.GenericIPAddressField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-id"]
+        verbose_name = "actividad"
+        verbose_name_plural = "actividad de usuarios"
+
+    def __str__(self):
+        return f"#{self.pk} {self.username} {self.accion}"

@@ -4,6 +4,9 @@ from . import api
 
 urlpatterns = [
     path("csrf", api.csrf),
+    path("login", api.entrar),
+    path("logout", api.salir),
+    path("me", api.me),
     path("consumables", api.consumibles),
     path("consumables/<int:pk>", api.consumible_detalle),
     path("consumables/<int:pk>/agregar", api.agregar_stock),

@@ -108,17 +108,17 @@ export default function Entradas({ consumables, movements, prefill, onDone }) {
         {err && <div className="alert error">{err}</div>}
         <table>
           <thead>
-            <tr><th>Folio</th><th>Fecha</th><th>Modelo</th><th>Cant.</th><th>Proveedor / factura</th><th>Notas</th><th></th></tr>
+            <tr><th>Folio</th><th>Fecha</th><th>Modelo</th><th>Cant.</th><th>Proveedor / factura</th><th>Notas</th><th>Registró</th><th></th></tr>
           </thead>
           <tbody>
             {entradas.map((m) => (
               <tr key={m.id} className={m.anulado ? 'muted' : ''}>
                 <td>{m.id}</td><td>{m.fecha}</td><td>{m.modelo}</td><td>{m.cantidad}</td>
-                <td>{m.persona}</td><td>{m.notas}</td>
-                <td>{m.anulado ? <em>anulado</em> : <button className="link" onClick={() => anular(m)}>Anular</button>}</td>
+                <td>{m.persona}</td><td>{m.notas}</td><td>{m.usuario}</td>
+                <td>{m.anulado ? <em>anulado{m.anulado_por ? ` por ${m.anulado_por}` : ''}</em> : <button className="link" onClick={() => anular(m)}>Anular</button>}</td>
               </tr>
             ))}
-            {entradas.length === 0 && <tr><td colSpan="7">Aún no hay entradas.</td></tr>}
+            {entradas.length === 0 && <tr><td colSpan="8">Aún no hay entradas.</td></tr>}
           </tbody>
         </table>
       </div>

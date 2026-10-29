@@ -4,6 +4,7 @@ import Salidas from './components/Salidas'
 import Entradas from './components/Entradas'
 import Stock from './components/Stock'
 import Impresoras from './components/Impresoras'
+import Login from './components/Login'
 
 const TABS = ['Salidas', 'Entradas', 'Inventario', 'Impresoras']
 
@@ -13,10 +14,12 @@ export default function App() {
   const [movements, setMovements] = useState([])
   const [printers, setPrinters] = useState([])
   const [departamentos, setDepartamentos] = useState([])
-  const [prefill, setPrefill] = useState(null) 
+  const [prefill, setPrefill] = useState(null)
   const [prefillEntrada, setPrefillEntrada] = useState(null)
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(true)
+  const [usuario, setUsuario] = useState(null)
+  const [sesionLista, setSesionLista] = useState(false)
 
   const reload = useCallback(async () => {
     try {
@@ -32,7 +35,29 @@ export default function App() {
     }
   }, [])
 
-  useEffect(() => { api.csrf().catch(() => {}).then(reload) }, [reload])
+  useEffect(() => {
+    api.csrf().catch(() => {})
+      .then(() => api.me())
+      .then(setUsuario)
+      .catch(() => setUsuario(null))
+      .finally(() => setSesionLista(true))
+  }, [])
+
+  useEffect(() => {
+    if (usuario) reload()
+  }, [usuario, reload])
+
+  useEffect(() => {
+    const cerrar = () => setUsuario(null)
+    window.addEventListener('sesion-expirada', cerrar)
+    return () => window.removeEventListener('sesion-expirada', cerrar)
+  }, [])
+
+  const salir = async () => {
+    try { await api.logout() } catch {}
+    setUsuario(null)
+    setCargando(true)
+  }
 
   const entregar = (consumable_id, departamento) => {
     setPrefill({ consumable_id, departamento })
@@ -46,6 +71,9 @@ export default function App() {
 
   const bajos = consumables.filter((c) => c.stock <= c.stock_minimo).length
 
+  if (!sesionLista) return <div className="cargando">Cargando…</div>
+  if (!usuario) return <Login onLogin={setUsuario} />
+
   return (
     <>
       <header className="topbar">
@@ -58,6 +86,10 @@ export default function App() {
             </button>
           ))}
         </nav>
+        <div className="usuario">
+          <span>{usuario.nombre}</span>
+          <button className="link" onClick={salir}>Salir</button>
+        </div>
       </header>
 
       <div className="app">

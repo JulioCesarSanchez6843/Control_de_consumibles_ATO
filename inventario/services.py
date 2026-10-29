@@ -1,14 +1,15 @@
-"""Reglas de negocio: aquí es donde el stock se actualiza solo."""
 from django.db import transaction
 
+from . import auditoria
 from .models import Consumible, Movimiento
 
 
 class ErrorInventario(Exception):
-    """Error que se le muestra al usuario tal cual."""
+    pass
+
 
 @transaction.atomic
-def registrar_salida(*, consumible, cantidad, departamento="", persona="", notas=""):
+def registrar_salida(*, consumible, cantidad, departamento="", persona="", notas="", usuario=None):
     c = Consumible.objects.select_for_update().get(pk=consumible.pk)
     departamento = (departamento or "").strip()
     if not departamento:
@@ -18,23 +19,31 @@ def registrar_salida(*, consumible, cantidad, departamento="", persona="", notas
         raise ErrorInventario(f"Stock insuficiente de {c.modelo}: hay {c.stock} y pides {cantidad}.")
     c.stock = nuevo
     c.save(update_fields=["stock"])
-    return Movimiento.objects.create(
+    m = Movimiento.objects.create(
         consumible=c, tipo=Movimiento.SALIDA, cantidad=cantidad, departamento=departamento,
-        persona=(persona or "").strip(), notas=(notas or "").strip())
+        persona=(persona or "").strip(), notas=(notas or "").strip(), usuario=usuario)
+    auditoria.registrar(
+        "salida", usuario=usuario, movimiento=m,
+        detalle=f"{cantidad} x {c.modelo} a {departamento}" + (f" ({m.persona})" if m.persona else ""))
+    return m
 
 
 @transaction.atomic
-def agregar_stock(pk, cantidad, proveedor="", notas=""):
+def agregar_stock(pk, cantidad, proveedor="", notas="", usuario=None):
     c = Consumible.objects.select_for_update().get(pk=pk)
     c.stock += cantidad
     c.save(update_fields=["stock"])
-    return Movimiento.objects.create(
+    m = Movimiento.objects.create(
         consumible=c, tipo=Movimiento.ENTRADA, cantidad=cantidad,
-        persona=(proveedor or "").strip(), notas=(notas or "").strip())
+        persona=(proveedor or "").strip(), notas=(notas or "").strip(), usuario=usuario)
+    auditoria.registrar(
+        "entrada", usuario=usuario, movimiento=m,
+        detalle=f"{cantidad} x {c.modelo}" + (f" de {m.persona}" if m.persona else ""))
+    return m
+
 
 @transaction.atomic
-def anular_movimiento(pk):
-    """No borra el registro (queda para auditoría): lo marca anulado y revierte el stock."""
+def anular_movimiento(pk, usuario=None):
     m = Movimiento.objects.select_for_update().get(pk=pk)
     if m.anulado:
         raise ErrorInventario("Ese movimiento ya estaba anulado.")
@@ -45,5 +54,9 @@ def anular_movimiento(pk):
     c.stock = nuevo
     c.save(update_fields=["stock"])
     m.anulado = True
-    m.save(update_fields=["anulado"])
+    m.anulado_por = usuario
+    m.save(update_fields=["anulado", "anulado_por"])
+    auditoria.registrar(
+        "anulacion", usuario=usuario, movimiento=m,
+        detalle=f"{m.tipo} #{m.pk}: {m.cantidad} x {c.modelo}")
     return m
