@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api } from '../api'
 
 const VACIO = { departamento: '', marca: '', modelo: '', tipo: '' }
@@ -9,6 +9,12 @@ export default function ImpresoraForm({ inicial, departamentos, onGuardado, onCa
   const editando = Boolean(inicial && inicial.id)
 
   const set = (k) => (e) => setD({ ...d, [k]: e.target.value })
+
+  useEffect(() => {
+    const tecla = (e) => { if (e.key === 'Escape') onCancelar() }
+    window.addEventListener('keydown', tecla)
+    return () => window.removeEventListener('keydown', tecla)
+  }, [onCancelar])
 
   const guardar = async (e) => {
     e.preventDefault()
@@ -21,20 +27,40 @@ export default function ImpresoraForm({ inicial, departamentos, onGuardado, onCa
   }
 
   return (
-    <div className="panel">
-      <form className="inline-form" onSubmit={guardar}>
-        <h3>{editando ? 'Editar impresora' : 'Agregar impresora nueva'}</h3>
-        <input required list="lista-deptos" placeholder="Departamento" value={d.departamento}
-          onChange={set('departamento')} />
+    <div className="modal-fondo" onMouseDown={(e) => { if (e.target === e.currentTarget) onCancelar() }}>
+      <form className="modal" onSubmit={guardar} role="dialog" aria-modal="true" aria-labelledby="modal-titulo">
+        <div className="modal-cabecera">
+          <h2 id="modal-titulo">{editando ? 'Editar impresora' : 'Nueva impresora'}</h2>
+          <button type="button" className="modal-cerrar" onClick={onCancelar} aria-label="Cerrar">×</button>
+        </div>
+
+        <label>Departamento
+          <input required autoFocus list="lista-deptos" value={d.departamento}
+            onChange={set('departamento')} autoComplete="off" />
+        </label>
         <datalist id="lista-deptos">
           {departamentos.map((x) => <option key={x} value={x} />)}
         </datalist>
-        <input placeholder="Marca" value={d.marca} onChange={set('marca')} />
-        <input required placeholder="Modelo" value={d.modelo} onChange={set('modelo')} />
-        <input placeholder="Tipo (Láser, Tinta…)" value={d.tipo} onChange={set('tipo')} />
-        <button className="btn" type="submit">{editando ? 'Guardar' : 'Agregar'}</button>
-        <button className="btn secondary" type="button" onClick={onCancelar}>Cancelar</button>
-        {err && <div className="alert error">{err}</div>}
+
+        <div className="fila-2">
+          <label>Marca
+            <input value={d.marca} onChange={set('marca')} autoComplete="off" />
+          </label>
+          <label>Modelo
+            <input required value={d.modelo} onChange={set('modelo')} autoComplete="off" />
+          </label>
+        </div>
+
+        <label>Tipo
+          <input placeholder="Láser, Tinta…" value={d.tipo} onChange={set('tipo')} autoComplete="off" />
+        </label>
+
+        {err && <div role="alert" className="alert error">{err}</div>}
+
+        <div className="modal-acciones">
+          <button type="button" className="btn secondary" onClick={onCancelar}>Cancelar</button>
+          <button type="submit" className="btn">{editando ? 'Guardar cambios' : 'Agregar impresora'}</button>
+        </div>
       </form>
     </div>
   )

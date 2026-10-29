@@ -28,8 +28,8 @@ export default function Impresoras({ printers, consumables, departamentos, onEnt
           <div className="toolbar">
           <input className="search" placeholder="Buscar por depto., marca, modelo…" value={q}
             onChange={(e) => setQ(e.target.value)} />
-          <button className="btn" type="button" onClick={() => setForm(form ? null : {})}>
-            {form ? 'Cerrar' : '+ Nueva impresora'}
+          <button className="btn" type="button" onClick={() => setForm({})}>
+            + Nueva impresora
           </button>
         </div>
       </div>

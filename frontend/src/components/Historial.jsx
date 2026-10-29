@@ -2,33 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
 
 const ACCIONES = [
-  ['login', 'Inicio de sesión'],
-  ['login_fallido', 'Intento de sesión fallido'],
-  ['logout', 'Cierre de sesión'],
-  ['salida', 'Salida registrada'],
-  ['entrada', 'Entrada registrada'],
-  ['anulacion', 'Movimiento anulado'],
-  ['consumible_alta', 'Consumible creado'],
-  ['consumible_edicion', 'Consumible editado'],
-  ['impresora_alta', 'Impresora creada'],
-  ['impresora_edicion', 'Impresora editada'],
-  ['impresora_baja', 'Impresora eliminada'],
-  ['linea_alta', 'Consumible agregado a impresora'],
-  ['linea_baja', 'Consumible quitado de impresora'],
-  ['usuario_alta', 'Usuario creado'],
-  ['usuario_edicion', 'Usuario editado'],
+  ['salida', 'Salidas (entregas)'],
+  ['entrada', 'Entradas'],
 ]
 
-const ALERTA = new Set(['login_fallido'])
-const AVISO = new Set(['anulacion', 'impresora_baja', 'linea_baja'])
-const NEUTRO = new Set(['login', 'logout'])
+const PERMITIDAS = ACCIONES.map(([v]) => v).join(',')
 
-const tono = (a) => {
-  if (ALERTA.has(a)) return 'agotado'
-  if (AVISO.has(a)) return 'bajo'
-  if (NEUTRO.has(a)) return 'neutro'
-  return 'ok'
-}
+const tono = (a) => (a === 'entrada' ? 'entrada' : 'salida')
 
 export default function Historial() {
   const [usuarios, setUsuarios] = useState([])
@@ -47,6 +27,7 @@ export default function Historial() {
     const params = {}
     if (filtroUsuario) params.usuario = filtroUsuario
     if (filtroAccion) params.accion = filtroAccion
+    else params.acciones = PERMITIDAS
     setCargando(true)
     try {
       setActividad(await api.actividad(params))
@@ -82,7 +63,7 @@ export default function Historial() {
             {usuarios.map((u) => <option key={u.id} value={u.username}>{u.username}</option>)}
           </select>
           <select className="search" value={filtroAccion} onChange={(e) => setFiltroAccion(e.target.value)}>
-            <option value="">Todas las acciones</option>
+            <option value="">Entradas y salidas</option>
             {ACCIONES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
           <button className="btn secondary" type="button" onClick={cargar} disabled={cargando}>

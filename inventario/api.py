@@ -358,10 +358,13 @@ def actividad(request):
     qs = Actividad.objects.all()
     usuario = request.GET.get("usuario", "").strip()
     accion = request.GET.get("accion", "").strip()
+    acciones = [x.strip() for x in request.GET.get("acciones", "").split(",") if x.strip()]
     if usuario:
         qs = qs.filter(username=usuario)
     if accion:
         qs = qs.filter(accion=accion)
+    elif acciones:
+        qs = qs.filter(accion__in=acciones)
     return JsonResponse([{
         "id": a.pk, "fecha": timezone.localtime(a.fecha).strftime("%Y-%m-%d %H:%M"),
         "username": a.username, "accion": a.accion, "accion_texto": a.get_accion_display(),

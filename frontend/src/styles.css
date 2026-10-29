@@ -219,3 +219,9 @@ input, select { border-radius: 9px; }
   .usuario-datos { display: none; }
   .tabs { order: 3; flex: 1 0 100%; overflow-x: auto; }
 }
+
+.fila-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+@media (max-width: 480px) {
+  .fila-2 { grid-template-columns: 1fr; }
+}
