@@ -6,6 +6,7 @@ import Stock from './components/Stock'
 import Impresoras from './components/Impresoras'
 import Login from './components/Login'
 import Usuarios from './components/Usuarios'
+import Historial from './components/Historial'
 
 const TABS = ['Salidas', 'Entradas', 'Inventario', 'Impresoras']
 
@@ -71,7 +72,7 @@ export default function App() {
   }
 
   const bajos = consumables.filter((c) => c.stock <= c.stock_minimo).length
-  const tabs = usuario?.es_admin ? [...TABS, 'Usuarios'] : TABS
+  const tabs = usuario?.es_admin ? [...TABS, 'Usuarios', 'Historial'] : TABS
 
   if (!sesionLista) return <div className="cargando">Cargando…</div>
   if (!usuario) return <Login onLogin={(u) => { setTab('Salidas'); setUsuario(u) }} />
@@ -79,8 +80,13 @@ export default function App() {
   return (
     <>
       <header className="topbar">
-        <img src="/static/logo_tollocan.png" alt="Grupo Tollocan" className="logo" />
-        <h1>Control de consumibles</h1>
+        <div className="marca">
+          <img src="/static/logo_tollocan.png" alt="Grupo Tollocan" className="logo" />
+          <div className="marca-texto">
+            <strong>Control de consumibles</strong>
+            <span>Grupo Tollocan</span>
+          </div>
+        </div>
         <nav className="tabs">
           {tabs.map((t) => (
             <button key={t} className={t === tab ? 'active' : ''} onClick={() => setTab(t)}>
@@ -89,8 +95,12 @@ export default function App() {
           ))}
         </nav>
         <div className="usuario">
-          <span>{usuario.nombre} ({usuario.es_admin ? 'Encargado' : 'Becario'})</span>
-          <button className="link" onClick={salir}>Salir</button>
+          <div className="avatar">{(usuario.nombre || usuario.username || '?').slice(0, 1).toUpperCase()}</div>
+          <div className="usuario-datos">
+            <strong>{usuario.nombre || usuario.username}</strong>
+            <span>{usuario.es_admin ? 'Encargado' : 'Becario'}</span>
+          </div>
+          <button className="btn-salir" onClick={salir}>Salir</button>
         </div>
       </header>
 
@@ -117,6 +127,7 @@ export default function App() {
             onEntregar={entregar} onChange={reload} />
         )}
         {tab === 'Usuarios' && usuario.es_admin && <Usuarios usuarioActual={usuario} />}
+        {tab === 'Historial' && usuario.es_admin && <Historial />}
       </main>
       </div>
     </>
