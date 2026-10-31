@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from .models import Actividad, Consumible, Impresora, ImpresoraConsumible, Movimiento, Usuario, Usuario
+from .models import Actividad, Consumible, Impresora, ImpresoraConsumible, Movimiento, Usuario
 
 
 @admin.register(Consumible)

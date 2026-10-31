@@ -10,9 +10,11 @@ if not exist ".venv\Scripts\python.exe" (
 )
 
 ".venv\Scripts\python.exe" manage.py crear_db
-if errorlevel 1 goto error
+if errorlevel 1 goto errordb
 ".venv\Scripts\python.exe" manage.py makemigrations inventario
+if errorlevel 1 goto errormig
 ".venv\Scripts\python.exe" manage.py migrate
+if errorlevel 1 goto errormig
 
 if exist "frontend\dist\index.html" goto arrancar
 where npm >nul 2>nul
@@ -33,7 +35,14 @@ start "" cmd /c "timeout /t 3 >nul & start http://127.0.0.1:%PORT%"
 pause
 goto :eof
 
-:error
+:errordb
 echo.
 echo Fallo la conexion a PostgreSQL. Revisa el archivo .env y que el servicio este encendido.
 pause
+goto :eof
+
+:errormig
+echo.
+echo Fallaron las migraciones de la base de datos. Revisa el mensaje de arriba antes de continuar.
+pause
+goto :eof

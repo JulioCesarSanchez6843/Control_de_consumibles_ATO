@@ -19,11 +19,25 @@ def _cargar_env():
 
 _cargar_env()
 
-SECRET_KEY = "cambia-esto-si-lo-vas-a-publicar"
-DEBUG = True
-ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
-# Para desarrollo del front con "npm run dev" (puerto 5173)
-CSRF_TRUSTED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
+def _lista(nombre):
+    return [x.strip() for x in os.environ.get(nombre, "").split(",") if x.strip()]
+
+
+DEBUG = os.environ.get("DJANGO_DEBUG", "1") == "1"
+
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "")
+if not SECRET_KEY:
+    if not DEBUG:
+        raise RuntimeError("Falta DJANGO_SECRET_KEY en el archivo .env")
+    SECRET_KEY = "#-0+e+4c696*fr^x$wz-7w4ufi-jg3a!8wx4=ci=i_^*+f!zv"
+
+ALLOWED_HOSTS = ["127.0.0.1", "localhost"] + _lista("DJANGO_ALLOWED_HOSTS")
+CSRF_TRUSTED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"] + _lista("DJANGO_CSRF_ORIGINS")
+
+if os.environ.get("DJANGO_HTTPS") == "1":
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 INSTALLED_APPS = [
     "inventario",

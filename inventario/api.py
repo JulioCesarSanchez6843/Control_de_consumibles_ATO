@@ -1,7 +1,9 @@
+import hashlib
 import json
 from functools import wraps
 
 from django.conf import settings
+from django.core.cache import cache
 from django.contrib.auth import authenticate, get_user_model, login, logout, update_session_auth_hash
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
@@ -37,6 +39,10 @@ def _entero(v, nombre, minimo=0, maximo=1_000_000):
 def _txt(d, k):
     return str(d.get(k) or "").strip()
 
+def _bool(v):
+    if isinstance(v, str):
+        return v.strip().lower() in ("true", "1", "si", "sí", "on", "yes")
+    return bool(v)
 
 def _cons(c):
     return {"id": c.pk, "modelo": c.modelo, "departamento": c.departamento, "descripcion": c.descripcion,
@@ -163,13 +169,28 @@ def perfil(request):
     return JsonResponse(_usuario(u))
 
 
+LOGIN_MAX_INTENTOS = 5
+LOGIN_BLOQUEO_SEG = 900
+
+
+def _clave_login(request, username):
+    huella = hashlib.sha256(username.lower().encode("utf-8")).hexdigest()[:16]
+    return f"login:{request.META.get('REMOTE_ADDR', '')}:{huella}"
+
+
 @require_POST
 def entrar(request):
     d = _body(request)
-    user = authenticate(request, username=_txt(d, "username"), password=str(d.get("password") or ""))
+    username = _txt(d, "username")
+    clave = _clave_login(request, username)
+    if cache.get(clave, 0) >= LOGIN_MAX_INTENTOS:
+        return _err("Demasiados intentos fallidos. Espera 15 minutos e inténtalo de nuevo", 429)
+    user = authenticate(request, username=username, password=str(d.get("password") or ""))
     if user is None:
-        auditoria.registrar("login_fallido", username=_txt(d, "username")[:150], request=request)
+        cache.set(clave, cache.get(clave, 0) + 1, LOGIN_BLOQUEO_SEG)
+        auditoria.registrar("login_fallido", username=username[:150], request=request)
         return _err("Usuario o contraseña incorrectos", 401)
+    cache.delete(clave)
     login(request, user)
     auditoria.registrar("login", usuario=user, request=request)
     return JsonResponse(_usuario(user))
@@ -388,7 +409,7 @@ def usuarios(request):
     if User.objects.filter(username__iexact=username).exists():
         return _err(f"Ya existe el usuario '{username}'")
     u = User.objects.create_user(username=username, password=password,
-                                 first_name=_txt(d, "nombre")[:150], is_staff=bool(d.get("es_admin")))
+                                 first_name=_txt(d, "nombre")[:150], is_staff=_bool(d.get("es_admin")))
     rol = "encargado" if u.is_staff else "becario"
     auditoria.registrar("usuario_alta", usuario=request.user, detalle=f"{u.username} ({rol})")
     return JsonResponse(_usuario_admin(u), status=201)
@@ -406,14 +427,14 @@ def usuario_detalle(request, pk):
     propio = u.pk == request.user.pk
     cambios = []
     if "activo" in d:
-        if propio and not d["activo"]:
+        if propio and not _bool(d["activo"]):
             return _err("No puedes desactivar tu propio usuario")
-        u.is_active = bool(d["activo"])
+        u.is_active = _bool(d["activo"])
         cambios.append("activado" if u.is_active else "desactivado")
     if "es_admin" in d:
-        if propio and not d["es_admin"]:
+        if propio and not _bool(d["es_admin"]):
             return _err("No puedes quitarte el rol de encargado")
-        u.is_staff = bool(d["es_admin"])
+        u.is_staff = _bool(d["es_admin"])
         cambios.append("ahora encargado" if u.is_staff else "ahora becario")
     if "nombre" in d:
         u.first_name = _txt(d, "nombre")[:150]

@@ -5,7 +5,7 @@ export function usePagina(lista, filas) {
   const [pagina, setPagina] = useState(1)
   const total = Math.max(1, Math.ceil(lista.length / filas))
 
-  useEffect(() => { setPagina(1) }, [filas, lista.length])
+  useEffect(() => { setPagina(1) }, [filas])
 
   const actual = Math.min(pagina, total)
   const items = lista.slice((actual - 1) * filas, actual * filas)
