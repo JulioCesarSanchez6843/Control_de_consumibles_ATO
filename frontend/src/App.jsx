@@ -7,7 +7,11 @@ import Impresoras from './components/Impresoras'
 import Login from './components/Login'
 import Usuarios from './components/Usuarios'
 import Historial from './components/Historial'
-import { Boxes, ClipboardList, History as IcoHistorial, LogOut, PackageMinus, PackagePlus, Printer, ShieldCheck, Users, Warehouse } from 'lucide-react'
+import MenuUsuario from './components/MenuUsuario'
+import Ajustes from './components/Ajustes'
+import useTema from './useTema'
+import { aplicar, normalizar } from './preferencias'
+import { Boxes, ClipboardList, History as IcoHistorial, PackageMinus, PackagePlus, Printer, ShieldCheck, Users, Warehouse } from 'lucide-react'
 
 const GRUPOS = [
   { nombre: 'Bitácora', icono: ClipboardList, tabs: ['Salidas', 'Entradas'] },
@@ -15,7 +19,7 @@ const GRUPOS = [
   { nombre: 'Equipo TI', icono: ShieldCheck, tabs: ['Usuarios', 'Historial'], admin: true },
 ]
 
-const ETIQUETAS = { Inventario: 'Stock de consumibles' }
+const ETIQUETAS = { Inventario: 'Stock' }
 
 const ICONOS = {
   Salidas: PackageMinus,
@@ -44,6 +48,17 @@ export default function App() {
   const [usuario, setUsuario] = useState(null)
   const [sesionLista, setSesionLista] = useState(false)
 
+    const { aplicado, setTema } = useTema()
+  const prefs = normalizar(usuario && usuario.preferencias)
+
+  useEffect(() => {
+    aplicar(prefs, aplicado)
+  }, [prefs.color, prefs.fuente, prefs.tamano, aplicado])
+
+  useEffect(() => {
+    if (usuario) setTema(prefs.tema)
+  }, [usuario && usuario.username, prefs.tema, setTema])
+
   const reload = useCallback(async () => {
     try {
       const [c, m, p, d] = await Promise.all([
@@ -61,7 +76,7 @@ export default function App() {
   useEffect(() => {
     api.csrf().catch(() => {})
       .then(() => api.me())
-      .then(setUsuario)
+      .then((u) => { setTab(normalizar(u.preferencias).inicio); setUsuario(u) })
       .catch(() => setUsuario(null))
       .finally(() => setSesionLista(true))
   }, [])
@@ -76,10 +91,25 @@ export default function App() {
     return () => window.removeEventListener('sesion-expirada', cerrar)
   }, [])
 
+  useEffect(() => {
+    if (tab !== 'Salidas') setPrefill(null)
+    if (tab !== 'Entradas') setPrefillEntrada(null)
+  }, [tab])
+
   const salir = async () => {
     try { await api.logout() } catch {}
     setUsuario(null)
     setCargando(true)
+  }
+
+  const guardarPref = async (cambio) => {
+    setUsuario((u) => ({ ...u, preferencias: { ...normalizar(u.preferencias), ...cambio } }))
+    try {
+      setUsuario(await api.updatePreferencias(cambio))
+    } catch (e) {
+      api.me().then(setUsuario).catch(() => {})
+      throw e
+    }
   }
 
   const entregar = (consumable_id, departamento) => {
@@ -94,15 +124,18 @@ export default function App() {
 
   const bajos = consumables.filter((c) => c.stock <= c.stock_minimo).length
   const grupos = GRUPOS.filter((g) => !g.admin || usuario?.es_admin)
-  const grupo = grupos.find((g) => g.tabs.includes(tab)) || grupos[0]
+  const enAjustes = tab === 'Ajustes'
+  const grupo = enAjustes ? null : (grupos.find((g) => g.tabs.includes(tab)) || grupos[0])
 
   if (!sesionLista) return <div className="cargando"><span className="spinner" />Cargando…</div>
-  if (!usuario) return <Login onLogin={(u) => { setTab('Salidas'); setUsuario(u) }} />
+  if (!usuario) return <Login onLogin={(u) => { setTab(normalizar(u.preferencias).inicio); setUsuario(u) }} />
 
   return (
     <>
       <header className="topbar">
-        <div className="marca">
+         <div className="marca" role="button" tabIndex={0} title="Ir a la bitácora"
+          onClick={() => setTab('Salidas')}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setTab('Salidas') } }}>
           <img src="/static/logo_tollocan.png" alt="Grupo Tollocan" className="logo" />
           <div className="marca-texto">
             <strong>Control de consumibles</strong>
@@ -124,24 +157,32 @@ export default function App() {
           })}
         </nav>
         <div className="usuario">
-          <div className="avatar">{(usuario.nombre || usuario.username || '?').slice(0, 1).toUpperCase()}</div>
-          <div className="usuario-datos">
-            <strong>{usuario.nombre || usuario.username}</strong>
-            <span>{usuario.es_admin ? 'Encargado' : 'Becario'}</span>
-          </div>
-          <button className="btn-salir" onClick={salir}><LogOut size={16} /> Salir</button>
+          <button type="button" className="usuario-perfil" title="Editar mi perfil" onClick={() => setTab('Ajustes')}>
+            {usuario.foto
+              ? <img className="avatar" src={usuario.foto} alt="" />
+              : <div className="avatar">{(usuario.nombre || usuario.username || '?').slice(0, 1).toUpperCase()}</div>}
+            <div className="usuario-datos">
+              <strong>{usuario.nombre || usuario.username}</strong>
+              <span>{usuario.es_admin ? 'Encargado' : 'Becario'}</span>
+            </div>
+          </button>
+          <MenuUsuario onAjustes={() => setTab('Ajustes')} onSalir={salir} />
         </div>
       </header>
 
-      <nav className="subnav" key={grupo.nombre}>
-        {grupo.tabs.map((t) => (
-          <button key={t} className={t === tab ? 'active' : ''} onClick={() => setTab(t)}>
-            <Ico t={t} />
-            <span>{ETIQUETAS[t] || t}</span>
-            {t === 'Inventario' && bajos > 0 && <span className="badge">{bajos}</span>}
-          </button>
-        ))}
-      </nav>
+      <div className={'shell' + (enAjustes ? ' sin-sub' : '')}>
+      {grupo && (
+        <nav className="subnav" key={grupo.nombre}>
+          <span className="subnav-titulo">{grupo.nombre}</span>
+          {grupo.tabs.map((t) => (
+            <button key={t} className={t === tab ? 'active' : ''} onClick={() => setTab(t)}>
+              <Ico t={t} />
+              <span>{ETIQUETAS[t] || t}</span>
+              {t === 'Inventario' && bajos > 0 && <span className="badge">{bajos}</span>}
+            </button>
+          ))}
+        </nav>
+      )}
 
       <div className="app">
 
@@ -153,13 +194,13 @@ export default function App() {
       <main key={tab} hidden={cargando} className="vista">
         {tab === 'Salidas' && (
           <Salidas consumables={consumables} departamentos={departamentos} printers={printers}
-            movements={movements} prefill={prefill} onDone={reload} />
+            movements={movements} prefill={prefill} onDone={reload} filas={prefs.filas} />
         )}
         {tab === 'Entradas' && (
-          <Entradas consumables={consumables} movements={movements} prefill={prefillEntrada} onDone={reload} />
+          <Entradas consumables={consumables} movements={movements} prefill={prefillEntrada} onDone={reload} filas={prefs.filas} />
         )}
         {tab === 'Inventario' && (
-            <Stock consumables={consumables} departamentos={departamentos} onChange={reload}
+            <Stock consumables={consumables} departamentos={departamentos} onChange={reload} filas={prefs.filas}
             onMover={entregar} onRecibir={recibir} />
         )}
         {tab === 'Impresoras' && (
@@ -167,8 +208,12 @@ export default function App() {
             onEntregar={entregar} onChange={reload} />
         )}
         {tab === 'Usuarios' && usuario.es_admin && <Usuarios usuarioActual={usuario} />}
-        {tab === 'Historial' && usuario.es_admin && <Historial />}
+        {tab === 'Historial' && usuario.es_admin && <Historial filas={prefs.filas} />}
+        {tab === 'Ajustes' && (
+          <Ajustes usuario={usuario} onSalir={salir} onPerfil={setUsuario} prefs={prefs} onPref={guardarPref} />
+        )}
       </main>
+      </div>
       </div>
     </>
   )

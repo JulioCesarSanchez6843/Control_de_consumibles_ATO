@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
+import Paginador, { usePagina } from './Paginador'
 
 const ACCIONES = [
   ['salida', 'Salidas (entregas)'],
@@ -10,7 +11,7 @@ const PERMITIDAS = ACCIONES.map(([v]) => v).join(',')
 
 const tono = (a) => (a === 'entrada' ? 'entrada' : 'salida')
 
-export default function Historial() {
+export default function Historial({ filas = 25 }) {
   const [usuarios, setUsuarios] = useState([])
   const [actividad, setActividad] = useState([])
   const [filtroUsuario, setFiltroUsuario] = useState('')
@@ -48,6 +49,8 @@ export default function Historial() {
       a.detalle.toLowerCase().includes(t) || a.username.toLowerCase().includes(t))
   }, [actividad, busqueda])
 
+  const pag = usePagina(visibles, filas)
+
   return (
     <div className="card">
       <div className="toolbar">
@@ -79,7 +82,7 @@ export default function Historial() {
           <tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Detalle</th><th>IP</th></tr>
         </thead>
         <tbody>
-          {visibles.map((a) => (
+          {pag.items.map((a) => (
             <tr key={a.id}>
               <td className="nowrap">{a.fecha}</td>
               <td><strong>{a.username || '—'}</strong></td>
@@ -91,6 +94,7 @@ export default function Historial() {
           {visibles.length === 0 && <tr><td colSpan="5" className="vacio">Sin actividad.</td></tr>}
         </tbody>
       </table>
+      <Paginador p={pag} />
     </div>
   )
 }

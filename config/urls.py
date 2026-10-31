@@ -10,5 +10,5 @@ urlpatterns = [
     path("api/", include("inventario.urls")),
     re_path(r"^static/(?P<path>.*)$", serve, {"document_root": settings.BASE_DIR / "static"}),
     re_path(r"^assets/(?P<path>.*)$", serve, {"document_root": DIST / "assets"}),
-    re_path(r"^.*$", spa),  # cualquier otra ruta -> la app React
+    re_path(r"^(?!api/).*$", spa), 
 ]

@@ -11,14 +11,13 @@ class Command(BaseCommand):
         cfg = settings.DATABASES["default"]
         nombre = cfg["NAME"]
         try:
-            # Se conecta a la base de mantenimiento "postgres" para poder crear la nueva.
             with psycopg.connect(dbname="postgres", user=cfg["USER"], password=cfg["PASSWORD"],
                                  host=cfg["HOST"], port=cfg["PORT"], autocommit=True) as con:
                 existe = con.execute("SELECT 1 FROM pg_database WHERE datname = %s", (nombre,)).fetchone()
                 if existe:
                     self.stdout.write(f"La base '{nombre}' ya existe.")
                     return
-                con.execute(sql.SQL("CREATE DATABASE {} ENCODING 'UTF8'").format(sql.Identifier(nombre)))
+                con.execute(sql.SQL("CREATE DATABASE {} ENCODING 'UTF8' TEMPLATE template0").format(sql.Identifier(nombre)))
         except psycopg.OperationalError as e:
             raise CommandError(
                 f"No pude conectar a PostgreSQL en {cfg['HOST']}:{cfg['PORT']} con el usuario "

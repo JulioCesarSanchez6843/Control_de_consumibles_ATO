@@ -23,16 +23,16 @@ def _body(request):
     except ValueError:
         return {}
 
-
-def _entero(v, nombre, minimo=0):
+def _entero(v, nombre, minimo=0, maximo=1_000_000):
     try:
         n = int(v)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         raise ValueError(f"{nombre} debe ser un número entero")
     if n < minimo:
         raise ValueError(f"{nombre} debe ser {minimo} o más")
+    if n > maximo:
+        raise ValueError(f"{nombre} no puede ser mayor a {maximo}")
     return n
-
 
 def _txt(d, k):
     return str(d.get(k) or "").strip()
@@ -62,9 +62,31 @@ def _impresora(p):
             } for ln in p.consumibles.all()]}
 
 
+PREFS_VALIDAS = {
+    "tema": ("claro", "oscuro", "sistema"),
+    "color": ("rojo", "azul", "verde", "morado", "naranja", "grafito"),
+    "fuente": ("sistema", "clasica", "redonda", "serif", "mono"),
+    "tamano": ("chico", "normal", "grande", "enorme"),
+    "filas": (10, 25, 50, 100),
+    "inicio": ("Salidas", "Entradas", "Inventario", "Impresoras"),
+}
+
+PREFS_BASE = {"tema": "oscuro", "color": "rojo", "fuente": "sistema", "tamano": "normal",
+              "filas": 25, "inicio": "Salidas"}
+
+
+def _prefs(guardadas):
+    prefs = dict(PREFS_BASE)
+    if isinstance(guardadas, dict):
+        for k, v in guardadas.items():
+            if k in PREFS_VALIDAS and v in PREFS_VALIDAS[k]:
+                prefs[k] = v
+    return prefs
+
+
 def _usuario(u):
     return {"username": u.get_username(), "nombre": u.get_full_name() or u.get_username(),
-            "es_admin": u.is_staff}
+            "es_admin": u.is_staff, "foto": u.foto, "preferencias": _prefs(u.preferencias)}
 
 
 def _usuario_admin(u):
@@ -93,6 +115,52 @@ def me(request):
     if not request.user.is_authenticated:
         return _err("No has iniciado sesión", 401)
     return JsonResponse(_usuario(request.user))
+
+
+FOTO_PREFIJOS = ("data:image/jpeg;base64,", "data:image/png;base64,", "data:image/webp;base64,")
+FOTO_MAX = 400_000
+
+
+@require_http_methods(["PUT"])
+def preferencias(request):
+    d = _body(request)
+    u = request.user
+    actuales = _prefs(u.preferencias)
+    for clave, valor in d.items():
+        if clave not in PREFS_VALIDAS:
+            return _err(f"Preferencia desconocida: {clave}")
+        if valor not in PREFS_VALIDAS[clave]:
+            return _err(f"Valor no válido para {clave}")
+        actuales[clave] = valor
+    u.preferencias = actuales
+    u.save(update_fields=["preferencias"])
+    return JsonResponse(_usuario(u))
+
+
+@require_http_methods(["PUT"])
+def perfil(request):
+    d = _body(request)
+    u = request.user
+    cambios = []
+    if "nombre" in d:
+        nombre = _txt(d, "nombre")
+        if not nombre:
+            return _err("El nombre no puede quedar vacío")
+        if len(nombre) > 150:
+            return _err("El nombre es demasiado largo")
+        u.first_name = nombre
+        u.last_name = ""
+        cambios.append("nombre")
+    if "foto" in d:
+        foto = str(d.get("foto") or "")
+        if foto and (not foto.startswith(FOTO_PREFIJOS) or len(foto) > FOTO_MAX):
+            return _err("La foto no es válida o pesa demasiado")
+        u.foto = foto
+        cambios.append("foto")
+    u.save(update_fields=["first_name", "last_name", "foto"])
+    auditoria.registrar("usuario_edicion", usuario=u,
+                        detalle=f"{u.username}: perfil propio ({', '.join(cambios) or 'sin cambios'})")
+    return JsonResponse(_usuario(u))
 
 
 @require_POST
@@ -275,9 +343,8 @@ def movimientos(request):
         qs = Movimiento.objects.select_related("consumible", "usuario", "anulado_por")[:500]
         return JsonResponse([_mov(m) for m in qs], safe=False)
     d = _body(request)
-    tipo = d.get("tipo", Movimiento.SALIDA)
-    if tipo not in (Movimiento.SALIDA, Movimiento.ENTRADA):
-        return _err("Tipo de movimiento no válido")
+    if d.get("tipo", Movimiento.SALIDA) != Movimiento.SALIDA:
+        return _err("Las entradas se registran desde la pantalla Entradas")
     try:
         cantidad = _entero(d.get("cantidad"), "La cantidad", minimo=1)
         consumible = Consumible.objects.get(pk=_entero(d.get("consumable_id"), "El consumible", minimo=1))

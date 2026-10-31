@@ -3,16 +3,17 @@ import { api } from '../api'
 import { ChevronsLeft, ChevronsRight } from 'lucide-react'
 import usePersistido from '../usePersistido'
 import { useToast } from './Toast'
+import Combobox from './Combobox'
+import Paginador, { usePagina } from './Paginador'
 
 const VACIO = { consumable_id: '', cantidad: 1, proveedor: '', notas: '' }
 
-export default function Entradas({ consumables, movements, prefill, onDone }) {
+export default function Entradas({ consumables, movements, prefill, onDone, filas = 25 }) {
   const [f, setF] = useState(VACIO)
   const [msg, setMsg] = useState(null)
-  const [busca, setBusca] = useState('')
   const [err, setErr] = useState('')
   const [enviando, setEnviando] = useState(false)
-  const [panel, setPanel] = usePersistido('panel-entradas', true)
+  const [panel, setPanel] = usePersistido('panel-entradas', false) 
   const toast = useToast()
   const [deptoSel, setDeptoSel] = useState('')
   const [q, setQ] = useState('')
@@ -33,12 +34,16 @@ export default function Entradas({ consumables, movements, prefill, onDone }) {
     [consumables])
 
   const opciones = useMemo(() => {
-    const t = busca.trim().toLowerCase()
     return consumables
       .filter((c) => !deptoSel || c.departamento === deptoSel)
-      .filter((c) => !t || c.id === Number(f.consumable_id) ||
-        `${c.departamento} ${c.modelo} ${c.descripcion} ${c.marca}`.toLowerCase().includes(t))
-  }, [busca, consumables, f.consumable_id, deptoSel])
+      .map((c) => ({
+        value: c.id,
+        label: `${c.modelo} · ${c.descripcion}`,
+        sub: `${c.departamento} · stock ${c.stock}`,
+        bajo: c.stock <= c.stock_minimo,
+        buscar: `${c.departamento} ${c.modelo} ${c.descripcion} ${c.marca}`,
+      }))
+  }, [consumables, deptoSel])
 
   const entradas = useMemo(() => {
     const t = q.trim().toLowerCase()
@@ -47,6 +52,8 @@ export default function Entradas({ consumables, movements, prefill, onDone }) {
       .filter((m) => !deptoFiltro || m.departamento === deptoFiltro)
       .filter((m) => `${m.modelo} ${m.descripcion} ${m.departamento} ${m.persona} ${m.usuario} ${m.notas}`.toLowerCase().includes(t))
   }, [movements, q, deptoFiltro])
+
+  const pag = usePagina(entradas, filas)
 
   const mover = (d) => setF({ ...f, cantidad: Math.max(1, (Number(f.cantidad) || 1) + d) })
 
@@ -61,7 +68,6 @@ export default function Entradas({ consumables, movements, prefill, onDone }) {
       clearTimeout(timer.current)
       timer.current = setTimeout(() => setMsg(null), 4000)
       setF({ ...VACIO, proveedor: f.proveedor })
-      setBusca('')
       onDone()
     } catch (ex) {
       setMsg({ ok: false, text: ex.message })
@@ -89,7 +95,7 @@ export default function Entradas({ consumables, movements, prefill, onDone }) {
           <button type="button" className="side-btn" onClick={() => setPanel(!panel)}
             title={panel ? 'Ocultar panel' : 'Mostrar panel'}
             aria-label={panel ? 'Ocultar panel' : 'Mostrar panel'}>
-            {panel ? <ChevronsLeft size={18} /> : <ChevronsRight size={18} />}
+            {panel ? <ChevronsRight size={18} /> : <ChevronsLeft size={18} />}
           </button>
         </div>
         <button type="button" className="side-rail" onClick={() => setPanel(true)}>Registrar entrada</button>
@@ -103,18 +109,12 @@ export default function Entradas({ consumables, movements, prefill, onDone }) {
             </select>
           </label>
 
-          <label>Consumible
-            <input type="search" className="buscar-sel" placeholder="Filtrar la lista…" value={busca}
-              onChange={(e) => setBusca(e.target.value)} />
-            <select required value={f.consumable_id} onChange={set('consumable_id')}>
-              <option value="">— Elige —</option>
-              {opciones.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.departamento} · {c.modelo} · {c.descripcion} (stock {c.stock})
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="field">
+            <span className="lbl">Consumible *</span>
+            <Combobox opciones={opciones} value={f.consumable_id}
+              onChange={(v) => setF({ ...f, consumable_id: v })} />
+          </div>
+          
           {sel && <p className="hint">Stock actual: {sel.stock}</p>}
 
           <div className="field">
@@ -133,7 +133,7 @@ export default function Entradas({ consumables, movements, prefill, onDone }) {
             <input value={f.notas} onChange={set('notas')} placeholder="Opcional" />
           </label>
 
-          <button className="btn" type="submit" disabled={enviando}>
+          <button className="btn" type="submit" disabled={enviando || !f.consumable_id}>
             {enviando ? 'Guardando…' : 'Registrar entrada'}
           </button>
           {msg && <div role="status" className={'alert ' + (msg.ok ? 'ok' : 'error')}>{msg.text}</div>}
@@ -159,7 +159,7 @@ export default function Entradas({ consumables, movements, prefill, onDone }) {
                 <th className="num">Cant.</th><th>Proveedor / factura</th><th>Notas</th><th>Registró</th><th>Estado</th></tr>
             </thead>
             <tbody>
-              {entradas.map((m) => (
+              {pag.items.map((m) => (
                 <tr key={m.id} className={m.anulado ? 'muted' : ''}>
                   <td className="id">{m.id}</td>
                   <td>{m.fecha}</td>
@@ -181,6 +181,7 @@ export default function Entradas({ consumables, movements, prefill, onDone }) {
             </tbody>
           </table>
         </div>
+        <Paginador p={pag} />
       </section>
     </div>
   )

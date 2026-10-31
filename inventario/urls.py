@@ -7,6 +7,8 @@ urlpatterns = [
     path("login", api.entrar),
     path("logout", api.salir),
     path("me", api.me),
+    path("me/perfil", api.perfil),
+    path("me/preferencias", api.preferencias),
     path("users", api.usuarios),
     path("users/<int:pk>", api.usuario_detalle),
     path("activity", api.actividad),

@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { api } from '../api'
+import Paginador, { usePagina } from './Paginador'
 import ConsumibleModal from './ConsumibleModal'
 
-export default function Stock({ consumables, departamentos, onChange, onMover, onRecibir }) {
+export default function Stock({ consumables, departamentos, onChange, onMover, onRecibir, filas = 25 }) {
   const [q, setQ] = useState('')
   const [filtro, setFiltro] = useState('todos')
   const [depto, setDepto] = useState('')
@@ -20,6 +21,8 @@ export default function Stock({ consumables, departamentos, onChange, onMover, o
     .filter((c) => filtro === 'todos' || estado(c) === filtro)
     .filter((c) => `${c.departamento} ${c.modelo} ${c.descripcion} ${c.marca} ${c.notas}`.toLowerCase().includes(q.toLowerCase()))
     .sort((a, b) => orden[estado(a)] - orden[estado(b)] || a.modelo.localeCompare(b.modelo))
+    
+  const pag = usePagina(lista, filas)
 
   const creado = () => {
     setMostrarForm(false)
@@ -85,7 +88,7 @@ export default function Stock({ consumables, departamentos, onChange, onMover, o
             <th className="num">Mínimo</th><th>Estado</th><th>Acciones</th></tr>
         </thead>
         <tbody>
-          {lista.map((c) => {
+          {pag.items.map((c) => {
             const est = estado(c)
             return (
               <tr key={c.id} className={'fila ' + est}>
@@ -121,6 +124,7 @@ export default function Stock({ consumables, departamentos, onChange, onMover, o
           {lista.length === 0 && <tr><td colSpan="9">Sin resultados.</td></tr>}
         </tbody>
       </table>
+      <Paginador p={pag} />
     </div>
   )
 }

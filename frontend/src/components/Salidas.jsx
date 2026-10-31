@@ -3,25 +3,29 @@ import { api } from '../api'
 import { ChevronsLeft, ChevronsRight } from 'lucide-react'
 import usePersistido from '../usePersistido'
 import { useToast } from './Toast'
+import Combobox from './Combobox'
+import Paginador, { usePagina } from './Paginador'
 
 const VACIO = { consumable_id: '', cantidad: 1, departamento: '', persona: '', notas: '' }
 
-export default function Salidas({ consumables, departamentos, printers, movements, prefill, onDone }) {
+export default function Salidas({ consumables, departamentos, printers, movements, prefill, onDone, filas = 25 }) {
   const [f, setF] = useState(VACIO)
   const [msg, setMsg] = useState(null)
-  const [busca, setBusca] = useState('')
   const [q, setQ] = useState('')
   const [err, setErr] = useState('')
   const [enviando, setEnviando] = useState(false)
-  const [panel, setPanel] = usePersistido('panel-salidas', true)
+  const [panel, setPanel] = usePersistido('panel-salidas', false)
   const toast = useToast()
   const [deptoFiltro, setDeptoFiltro] = useState('')
   const selRef = useRef(null)
   const timer = useRef(null)
 
   useEffect(() => {
-    if (prefill) setF((p) => ({ ...p, consumable_id: prefill.consumable_id ?? '',
-      departamento: prefill.departamento ?? '' }))
+    if (prefill) {
+      setPanel(true)
+      setF((p) => ({ ...p, consumable_id: prefill.consumable_id ?? '',
+        departamento: prefill.departamento ?? '' }))
+    }
   }, [prefill])
 
   useEffect(() => () => clearTimeout(timer.current), [])
@@ -43,12 +47,16 @@ export default function Salidas({ consumables, departamentos, printers, movement
 
   const opciones = useMemo(() => {
     const d = f.departamento.trim().toLowerCase()
-    const t = busca.trim().toLowerCase()
     return consumables
       .filter((c) => c.departamento.trim().toLowerCase() === d)
-      .filter((c) => !t || c.id === Number(f.consumable_id) ||
-        `${c.modelo} ${c.descripcion} ${c.marca}`.toLowerCase().includes(t))
-  }, [busca, consumables, f.consumable_id, f.departamento])
+      .map((c) => ({
+        value: c.id,
+        label: `${c.modelo} · ${c.descripcion}`,
+        sub: `Stock ${c.stock}`,
+        bajo: c.stock <= c.stock_minimo,
+        buscar: `${c.modelo} ${c.descripcion} ${c.marca}`,
+      }))
+  }, [consumables, f.departamento])
 
   const salidas = useMemo(() => {
     const t = q.trim().toLowerCase()
@@ -57,6 +65,8 @@ export default function Salidas({ consumables, departamentos, printers, movement
       .filter((m) => !deptoFiltro || m.departamento === deptoFiltro)
       .filter((m) => `${m.modelo} ${m.descripcion} ${m.departamento} ${m.persona} ${m.usuario} ${m.notas}`.toLowerCase().includes(t))
   }, [movements, q, deptoFiltro])
+
+  const pag = usePagina(salidas, filas)
 
   const cantidad = Number(f.cantidad)
   const excede = !!sel && cantidad > sel.stock
@@ -73,7 +83,6 @@ export default function Salidas({ consumables, departamentos, printers, movement
       clearTimeout(timer.current)
       timer.current = setTimeout(() => setMsg(null), 4000)
       setF({ ...VACIO, persona: f.persona })
-      setBusca('')
       onDone()
       if (selRef.current) selRef.current.focus()
     } catch (ex) {
@@ -102,7 +111,7 @@ export default function Salidas({ consumables, departamentos, printers, movement
           <button type="button" className="side-btn" onClick={() => setPanel(!panel)}
             title={panel ? 'Ocultar panel' : 'Mostrar panel'}
             aria-label={panel ? 'Ocultar panel' : 'Mostrar panel'}>
-            {panel ? <ChevronsLeft size={18} /> : <ChevronsRight size={18} />}
+            {panel ? <ChevronsRight size={18} /> : <ChevronsLeft size={18} />}
           </button>
         </div>
         <button type="button" className="side-rail" onClick={() => setPanel(true)}>Registrar salida</button>
@@ -129,18 +138,13 @@ export default function Salidas({ consumables, departamentos, printers, movement
             </div>
           )}
 
-          <label>Consumible
-            <input type="search" className="buscar-sel" placeholder="Filtrar la lista…" value={busca}
-              onChange={(e) => setBusca(e.target.value)} />
-            <select ref={selRef} required value={f.consumable_id} onChange={set('consumable_id')}>
-              <option value="">— Elige —</option>
-              {opciones.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.modelo} · {c.descripcion} (stock {c.stock})
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="field">
+            <span className="lbl">Consumible *</span>
+            <Combobox inputRef={selRef} opciones={opciones} value={f.consumable_id} disabled={!f.departamento}
+              placeholder={f.departamento ? 'Busca o elige un consumible…' : 'Elige primero el departamento'}
+              onChange={(v) => setF({ ...f, consumable_id: v })} />
+          </div>
+
           {sel && <p className={sel.stock <= sel.stock_minimo ? 'hint warn' : 'hint'}>Stock actual: {sel.stock}</p>}
 
           <div className="field">
@@ -161,7 +165,7 @@ export default function Salidas({ consumables, departamentos, printers, movement
             <input value={f.notas} onChange={set('notas')} placeholder="Opcional" />
           </label>
 
-          <button className="btn" type="submit" disabled={enviando || excede}>
+          <button className="btn" type="submit" disabled={enviando || excede || !f.consumable_id}>
             {enviando ? 'Guardando…' : 'Registrar salida'}
           </button>
           {msg && <div role="status" className={'alert ' + (msg.ok ? 'ok' : 'error')}>{msg.text}</div>}
@@ -187,7 +191,7 @@ export default function Salidas({ consumables, departamentos, printers, movement
                 <th className="num">Cant.</th><th>Persona</th><th>Notas</th><th>Registró</th><th>Estado</th></tr>
             </thead>
             <tbody>
-              {salidas.map((m) => (
+              {pag.items.map((m) => (
                 <tr key={m.id} className={m.anulado ? 'muted' : ''}>
                   <td className="id">{m.id}</td>
                   <td>{m.fecha}</td>
@@ -209,6 +213,7 @@ export default function Salidas({ consumables, departamentos, printers, movement
             </tbody>
           </table>
         </div>
+        <Paginador p={pag} />
       </section>
     </div>
   )

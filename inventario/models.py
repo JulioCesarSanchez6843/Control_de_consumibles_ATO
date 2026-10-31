@@ -16,6 +16,8 @@ class UsuarioManager(UserManager):
 
 class Usuario(AbstractUser):
     email = None
+    foto = models.TextField(blank=True, default="")
+    preferencias = models.JSONField(blank=True, default=dict)
     REQUIRED_FIELDS = []
 
     objects = UsuarioManager()

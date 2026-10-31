@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { api } from '../api'
+import BotonTema from './BotonTema'
 
 export default function Login({ onLogin }) {
   const [f, setF] = useState({ username: '', password: '' })
@@ -22,6 +23,7 @@ export default function Login({ onLogin }) {
 
   return (
     <div className="login-pagina">
+      <div className="tema-flotante"><BotonTema /></div>
       <form className="card login" onSubmit={submit}>
         <div className="login-cabecera">
           <img src="/static/logo_tollocan.png" alt="Grupo Tollocan" className="login-logo" />
