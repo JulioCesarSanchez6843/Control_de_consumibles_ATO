@@ -1,5 +1,7 @@
 import hashlib
 import json
+import re
+from decimal import Decimal, InvalidOperation
 from functools import wraps
 
 from django.conf import settings
@@ -7,11 +9,12 @@ from django.core.cache import cache
 from django.contrib.auth import authenticate, get_user_model, login, logout, update_session_auth_hash
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
+from django.utils.http import content_disposition_header
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
-from . import auditoria, services
-from .models import Actividad, Consumible, Impresora, ImpresoraConsumible, Movimiento
+from . import auditoria, requisicion, services
+from .models import Actividad, Consumible, Impresora, ImpresoraConsumible, Movimiento, NotaCompra
 
 
 def _err(msg, status=400):
@@ -489,3 +492,96 @@ def spa(request, *args, **kwargs):
     if not index.exists():
         return HttpResponse(SIN_COMPILAR, status=503)
     return HttpResponse(index.read_text(encoding="utf-8"))
+
+@require_POST
+def requisicion_excel(request):
+    try:
+        datos = requisicion.normalizar(_body(request))
+        contenido = requisicion.generar(datos)
+    except ValueError as ex:
+        return _err(str(ex))
+    except FileNotFoundError:
+        return _err("No se encontró la plantilla inventario/plantillas/requisicion.xlsm", 500)
+    nombre = "Requisicion " + (datos["folio"] or datos["fecha_solicitud"].replace("/", "-")) + ".xlsm"
+    nombre = re.sub(r'[\\/:*?"<>|]', "-", nombre)
+    respuesta = HttpResponse(contenido, content_type="application/vnd.ms-excel.sheet.macroEnabled.12")
+    respuesta["Content-Disposition"] = content_disposition_header(True, nombre)
+    return respuesta
+
+def _decimal(v, nombre, minimo=Decimal("0"), vacio_ok=False):
+    if v is None or str(v).strip() == "":
+        if vacio_ok:
+            return None
+        raise ValueError(f"{nombre} es obligatorio")
+    try:
+        n = Decimal(str(v).replace(",", "").strip())
+    except InvalidOperation:
+        raise ValueError(f"{nombre} debe ser un número")
+    if not n.is_finite():
+        raise ValueError(f"{nombre} debe ser un número")
+    if n < minimo:
+        raise ValueError(f"{nombre} debe ser {minimo} o más")
+    if n > Decimal("99999999.99"):
+        raise ValueError(f"{nombre} es demasiado grande")
+    return n.quantize(Decimal("0.01"))
+
+
+def _nota(n):
+    return {"id": n.pk, "item": n.item, "cantidad": float(n.cantidad), "unidad": n.unidad,
+            "costo": float(n.costo) if n.costo is not None else None, "link": n.link,
+            "descripcion": n.descripcion, "completado": n.completado}
+
+
+def _aplicar_nota(n, d):
+    if "item" in d:
+        n.item = _txt(d, "item")
+        if not n.item:
+            raise ValueError("El item es obligatorio")
+    if "cantidad" in d:
+        n.cantidad = _decimal(d["cantidad"], "La cantidad", minimo=Decimal("0.01"))
+    if "unidad" in d:
+        n.unidad = _txt(d, "unidad") or "PIEZA"
+    if "costo" in d:
+        n.costo = _decimal(d["costo"], "El costo", vacio_ok=True)
+    if "link" in d:
+        link = _txt(d, "link")
+        if link and not re.match(r"^https?://", link, re.I):
+            raise ValueError("El link debe empezar con http:// o https://")
+        n.link = link
+    if "descripcion" in d:
+        n.descripcion = _txt(d, "descripcion")
+    if "completado" in d:
+        n.completado = _bool(d["completado"])
+
+
+@require_http_methods(["GET", "POST"])
+def notas_compra(request):
+    if request.method == "GET":
+        return JsonResponse([_nota(n) for n in NotaCompra.objects.all()], safe=False)
+    n = NotaCompra()
+    try:
+        _aplicar_nota(n, _body(request))
+    except ValueError as e:
+        return _err(str(e))
+    if not n.item:
+        return _err("El item es obligatorio")
+    n.usuario = request.user
+    n.save()
+    return JsonResponse(_nota(n), status=201)
+
+
+@require_http_methods(["PUT", "DELETE"])
+def nota_compra_detalle(request, pk):
+    try:
+        n = NotaCompra.objects.get(pk=pk)
+    except NotaCompra.DoesNotExist:
+        return _err("Nota no encontrada", 404)
+    if request.method == "DELETE":
+        n.delete()
+        return JsonResponse({"ok": True})
+    try:
+        _aplicar_nota(n, _body(request))
+    except ValueError as e:
+        return _err(str(e))
+    n.save()
+    return JsonResponse(_nota(n))

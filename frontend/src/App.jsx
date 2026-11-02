@@ -9,13 +9,15 @@ import Usuarios from './components/Usuarios'
 import Historial from './components/Historial'
 import MenuUsuario from './components/MenuUsuario'
 import Ajustes from './components/Ajustes'
+import Requisicion from './components/Requisicion'
 import useTema from './useTema'
 import { aplicar, normalizar } from './preferencias'
-import { Boxes, ClipboardList, History as IcoHistorial, PackageMinus, PackagePlus, Printer, ShieldCheck, Users, Warehouse } from 'lucide-react'
+import { Boxes, ClipboardList, FileText, History as IcoHistorial, PackageMinus, PackagePlus, Printer, ShieldCheck, ShoppingCart, Users, Warehouse } from 'lucide-react'
 
 const GRUPOS = [
   { nombre: 'Bitácora', icono: ClipboardList, tabs: ['Salidas', 'Entradas'] },
   { nombre: 'Inventarios', icono: Warehouse, tabs: ['Inventario', 'Impresoras'] },
+  { nombre: 'Compras', icono: ShoppingCart, tabs: ['Requisición'] },
   { nombre: 'Equipo TI', icono: ShieldCheck, tabs: ['Usuarios', 'Historial'], admin: true },
 ]
 
@@ -28,6 +30,7 @@ const ICONOS = {
   Impresoras: Printer,
   Usuarios: Users,
   Historial: IcoHistorial,
+  'Requisición': FileText,
 }
 
 function Ico({ t }) {
@@ -209,6 +212,7 @@ export default function App() {
         )}
         {tab === 'Usuarios' && usuario.es_admin && <Usuarios usuarioActual={usuario} />}
         {tab === 'Historial' && usuario.es_admin && <Historial filas={prefs.filas} />}
+        {tab === 'Requisición' && <Requisicion usuario={usuario} departamentos={departamentos} />}
         {tab === 'Ajustes' && (
           <Ajustes usuario={usuario} onSalir={salir} onPerfil={setUsuario} prefs={prefs} onPref={guardarPref} />
         )}

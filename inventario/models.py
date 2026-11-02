@@ -146,3 +146,23 @@ class Actividad(models.Model):
 
     def __str__(self):
         return f"#{self.pk} {self.username} {self.accion}"
+
+class NotaCompra(models.Model):
+    item = models.CharField(max_length=200)
+    cantidad = models.DecimalField(max_digits=10, decimal_places=2, default=1)
+    unidad = models.CharField(max_length=30, default="PIEZA")
+    costo = models.DecimalField("costo unitario", max_digits=10, decimal_places=2, null=True, blank=True)
+    link = models.URLField(max_length=500, blank=True)
+    descripcion = models.CharField("descripción", max_length=500, blank=True)
+    completado = models.BooleanField(default=False)
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                                related_name="notas_compra")
+    creado = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["completado", "-id"]
+        verbose_name = "nota de compra"
+        verbose_name_plural = "notas de compra"
+
+    def __str__(self):
+        return f"{self.item} x {self.cantidad} {self.unidad}"

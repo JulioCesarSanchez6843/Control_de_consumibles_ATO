@@ -22,4 +22,7 @@ urlpatterns = [
     path("departamentos", api.departamentos),
     path("movements", api.movimientos),
     path("movements/<int:pk>/anular", api.anular),
+    path("requisicion/excel", api.requisicion_excel),
+    path("purchase-notes", api.notas_compra),
+    path("purchase-notes/<int:pk>", api.nota_compra_detalle),
 ]

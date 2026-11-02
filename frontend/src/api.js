@@ -44,5 +44,26 @@ export const api = {
   usuarios: () => req('/users'),
   addUsuario: (d) => req('/users', { method: 'POST', body: JSON.stringify(d) }),
   updateUsuario: (id, d) => req(`/users/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+  requisicionExcel: async (d) => {
+    const res = await fetch('/api/requisicion/excel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken() },
+      body: JSON.stringify(d),
+    })
+    if (!res.ok) {
+      if (res.status === 401) window.dispatchEvent(new Event('sesion-expirada'))
+      let msg = res.statusText
+      try {
+        const j = await res.json()
+        if (typeof j.detail === 'string') msg = j.detail
+      } catch {}
+      throw new Error(msg)
+    }
+    const cd = res.headers.get('Content-Disposition') || ''
+    const largo = cd.match(/filename\*=UTF-8''([^;]+)/)
+    const simple = cd.match(/filename="([^"]+)"/)
+    const nombre = largo ? decodeURIComponent(largo[1]) : simple ? simple[1] : 'Requisicion.xlsm'
+    return { blob: await res.blob(), nombre }
+  },
   actividad: (params) => req('/activity?' + new URLSearchParams(params).toString()),
 }

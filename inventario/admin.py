@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from .models import Actividad, Consumible, Impresora, ImpresoraConsumible, Movimiento, Usuario
+from .models import Actividad, Consumible, Impresora, ImpresoraConsumible, Movimiento, NotaCompra, Usuario
 
 
 @admin.register(Consumible)
@@ -58,3 +58,9 @@ class UsuarioAdmin(UserAdmin):
     )
     list_display = ("username", "first_name", "last_name", "is_staff", "is_active")
     search_fields = ("username", "first_name", "last_name")
+
+@admin.register(NotaCompra)
+class NotaCompraAdmin(admin.ModelAdmin):
+    list_display = ("item", "cantidad", "unidad", "costo", "completado", "usuario", "creado")
+    list_filter = ("completado",)
+    search_fields = ("item", "descripcion")
