@@ -65,5 +65,9 @@ export const api = {
     const nombre = largo ? decodeURIComponent(largo[1]) : simple ? simple[1] : 'Requisicion.xlsm'
     return { blob: await res.blob(), nombre }
   },
+  notasCompra: () => req('/purchase-notes'),
+  addNotaCompra: (d) => req('/purchase-notes', { method: 'POST', body: JSON.stringify(d) }),
+  updateNotaCompra: (id, d) => req(`/purchase-notes/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+  deleteNotaCompra: (id) => req(`/purchase-notes/${id}`, { method: 'DELETE' }),
   actividad: (params) => req('/activity?' + new URLSearchParams(params).toString()),
 }

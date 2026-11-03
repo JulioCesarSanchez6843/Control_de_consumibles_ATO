@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { LogOut, Menu, Settings, X } from 'lucide-react'
+import { LogOut, Menu, Settings, User, X } from 'lucide-react'
 
-export default function MenuUsuario({ onAjustes, onSalir }) {
+export default function MenuUsuario({ onPerfil, onAjustes, onSalir }) {
   const [abierto, setAbierto] = useState(false)
   const caja = useRef(null)
 
@@ -34,6 +34,9 @@ export default function MenuUsuario({ onAjustes, onSalir }) {
       </button>
       {abierto && (
         <div className="menu-lista" role="menu">
+          <button type="button" role="menuitem" className="menu-item" onClick={ir(onPerfil)}>
+            <User size={16} /> Mi perfil
+          </button>
           <button type="button" role="menuitem" className="menu-item" onClick={ir(onAjustes)}>
             <Settings size={16} /> Configuración
           </button>

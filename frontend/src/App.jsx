@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from './api'
 import Salidas from './components/Salidas'
 import Entradas from './components/Entradas'
@@ -9,15 +9,17 @@ import Usuarios from './components/Usuarios'
 import Historial from './components/Historial'
 import MenuUsuario from './components/MenuUsuario'
 import Ajustes from './components/Ajustes'
+import Perfil from './components/Perfil'
 import Requisicion from './components/Requisicion'
+import PendientesCompra from './components/PendientesCompra'
 import useTema from './useTema'
 import { aplicar, normalizar } from './preferencias'
-import { Boxes, ClipboardList, FileText, History as IcoHistorial, PackageMinus, PackagePlus, Printer, ShieldCheck, ShoppingCart, Users, Warehouse } from 'lucide-react'
+import { Boxes, CheckCheck, ClipboardList, FileText, History as IcoHistorial, ListChecks, PackageMinus, PackagePlus, Printer, ShieldCheck, ShoppingCart, Users, Warehouse } from 'lucide-react'
 
 const GRUPOS = [
   { nombre: 'Bitácora', icono: ClipboardList, tabs: ['Salidas', 'Entradas'] },
   { nombre: 'Inventarios', icono: Warehouse, tabs: ['Inventario', 'Impresoras'] },
-  { nombre: 'Compras', icono: ShoppingCart, tabs: ['Requisición'] },
+  { nombre: 'Compras', icono: ShoppingCart, tabs: ['Requisición', 'Por comprar'] },
   { nombre: 'Equipo TI', icono: ShieldCheck, tabs: ['Usuarios', 'Historial'], admin: true },
 ]
 
@@ -30,11 +32,11 @@ const ICONOS = {
   Impresoras: Printer,
   Usuarios: Users,
   Historial: IcoHistorial,
-  'Requisición': FileText,
+  'Por comprar': ListChecks,
 }
 
 function Ico({ t }) {
-  const Icono = ICONOS[t]
+  const Icono = ICONOS[t] || FileText
   return <Icono size={17} strokeWidth={2.2} />
 }
 
@@ -46,21 +48,26 @@ export default function App() {
   const [departamentos, setDepartamentos] = useState([])
   const [prefill, setPrefill] = useState(null)
   const [prefillEntrada, setPrefillEntrada] = useState(null)
+  const [prefillReq, setPrefillReq] = useState(null)
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(true)
   const [usuario, setUsuario] = useState(null)
   const [sesionLista, setSesionLista] = useState(false)
+  const colaPref = useRef(Promise.resolve())
+  const pendientes = useRef(0)
+  const [vista, setVista] = useState(null)
 
     const { aplicado, setTema } = useTema()
   const prefs = normalizar(usuario && usuario.preferencias)
+  const efectivas = vista || prefs
 
   useEffect(() => {
-    aplicar(prefs, aplicado)
-  }, [prefs.color, prefs.fuente, prefs.tamano, aplicado])
+    aplicar(efectivas, aplicado)
+  }, [efectivas.color, efectivas.fuente, efectivas.tamano, aplicado])
 
   useEffect(() => {
-    if (usuario) setTema(prefs.tema)
-  }, [usuario && usuario.username, prefs.tema, setTema])
+    if (usuario) setTema(efectivas.tema, !vista)
+  }, [usuario && usuario.username, efectivas.tema, vista, setTema])
 
   const reload = useCallback(async () => {
     try {
@@ -105,14 +112,22 @@ export default function App() {
     setCargando(true)
   }
 
-  const guardarPref = async (cambio) => {
+  const guardarPref = (cambio) => {
     setUsuario((u) => ({ ...u, preferencias: { ...normalizar(u.preferencias), ...cambio } }))
-    try {
-      setUsuario(await api.updatePreferencias(cambio))
-    } catch (e) {
-      api.me().then(setUsuario).catch(() => {})
-      throw e
-    }
+    pendientes.current += 1
+    const tarea = colaPref.current.then(async () => {
+      try {
+        const u = await api.updatePreferencias(cambio)
+        if (pendientes.current === 1) setUsuario(u)
+      } catch (e) {
+        api.me().then(setUsuario).catch(() => {})
+        throw e
+      } finally {
+        pendientes.current -= 1
+      }
+    })
+    colaPref.current = tarea.catch(() => {})
+    return tarea
   }
 
   const entregar = (consumable_id, departamento) => {
@@ -120,14 +135,14 @@ export default function App() {
     setTab('Salidas')
   }
 
-  const recibir = (consumable_id) => {
-    setPrefillEntrada({ consumable_id })
-    setTab('Entradas')
+  const pasarARequisicion = (lineas) => {
+    setPrefillReq(lineas)
+    setTab('Requisición')
   }
 
   const bajos = consumables.filter((c) => c.stock <= c.stock_minimo).length
   const grupos = GRUPOS.filter((g) => !g.admin || usuario?.es_admin)
-  const enAjustes = tab === 'Ajustes'
+  const enAjustes = tab === 'Ajustes' || tab === 'Perfil'
   const grupo = enAjustes ? null : (grupos.find((g) => g.tabs.includes(tab)) || grupos[0])
 
   if (!sesionLista) return <div className="cargando"><span className="spinner" />Cargando…</div>
@@ -160,7 +175,7 @@ export default function App() {
           })}
         </nav>
         <div className="usuario">
-          <button type="button" className="usuario-perfil" title="Editar mi perfil" onClick={() => setTab('Ajustes')}>
+          <button type="button" className="usuario-perfil" title="Editar mi perfil" onClick={() => setTab('Perfil')}>
             {usuario.foto
               ? <img className="avatar" src={usuario.foto} alt="" />
               : <div className="avatar">{(usuario.nombre || usuario.username || '?').slice(0, 1).toUpperCase()}</div>}
@@ -169,7 +184,7 @@ export default function App() {
               <span>{usuario.es_admin ? 'Encargado' : 'Becario'}</span>
             </div>
           </button>
-          <MenuUsuario onAjustes={() => setTab('Ajustes')} onSalir={salir} />
+          <MenuUsuario onPerfil={() => setTab('Perfil')} onAjustes={() => setTab('Ajustes')} onSalir={salir} />
         </div>
       </header>
 
@@ -212,9 +227,16 @@ export default function App() {
         )}
         {tab === 'Usuarios' && usuario.es_admin && <Usuarios usuarioActual={usuario} />}
         {tab === 'Historial' && usuario.es_admin && <Historial filas={prefs.filas} />}
-        {tab === 'Requisición' && <Requisicion usuario={usuario} departamentos={departamentos} />}
+        {tab === 'Requisición' && (
+          <Requisicion usuario={usuario} departamentos={departamentos} prefill={prefillReq}
+            onUsado={() => setPrefillReq(null)} />
+        )}
+        {tab === 'Por comprar' && <PendientesCompra usuario={usuario} onRequisicion={pasarARequisicion} />}
         {tab === 'Ajustes' && (
-          <Ajustes usuario={usuario} onSalir={salir} onPerfil={setUsuario} prefs={prefs} onPref={guardarPref} />
+          <Ajustes prefs={prefs} onPref={guardarPref} onVista={setVista} />
+        )}
+        {tab === 'Perfil' && (
+          <Perfil usuario={usuario} onPerfil={setUsuario} onSalir={salir} />
         )}
       </main>
       </div>

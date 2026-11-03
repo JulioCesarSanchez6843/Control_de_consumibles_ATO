@@ -13,7 +13,7 @@ CATEGORIAS = [
 ]
 COLUMNAS = "ABCDEFGHIJKLM"
 FILAS = [20 + 2 * i for i in range(13)]
-TASA_IVA = Decimal("0.16")
+IVA_DEFECTO = Decimal("16")
 CENTAVOS = Decimal("0.01")
 
 
@@ -78,6 +78,12 @@ def normalizar(d):
         raise ValueError("Agrega al menos un artículo con descripción")
     categorias = d.get("categorias") if isinstance(d.get("categorias"), list) else []
     presupuesto = _txt(d, "presupuesto", 5).upper()
+    if "ivaPct" in d:
+        iva_pct = _dec(d.get("ivaPct"), "El porcentaje de IVA") or Decimal(0)
+    else:
+        iva_pct = IVA_DEFECTO
+    if iva_pct < 0 or iva_pct > 100:
+        raise ValueError("El porcentaje de IVA debe estar entre 0 y 100")
     return {
         "empresa": empresa,
         "folio": _txt(d, "folio", 40),
@@ -90,7 +96,7 @@ def normalizar(d):
         "proveedor": _txt(d, "proveedor", 150),
         "lineas": lineas,
         "subtotal": _dec(d.get("subtotal"), "El subtotal"),
-        "iva": _dec(d.get("iva"), "El IVA"),
+        "iva_pct": iva_pct,
         "isr": _dec(d.get("isr"), "La retención de ISR"),
         "total": _dec(d.get("total"), "El total"),
         "observaciones": re.sub(r"\s*\n\s*", " ", _limpio(d.get("observaciones")))[:600],
@@ -160,7 +166,7 @@ def _hoja(xml, d):
         xml = _poner(xml, f"M{fila}", formula=f"A{fila}*K{fila}", cache=importe.quantize(CENTAVOS, ROUND_HALF_UP))
 
     subtotal = d["subtotal"] if d["subtotal"] is not None else subtotal_auto
-    iva = d["iva"] if d["iva"] is not None else subtotal * TASA_IVA
+    iva = subtotal * d["iva_pct"] / 100
     isr = d["isr"] if d["isr"] is not None else Decimal(0)
     total = d["total"] if d["total"] is not None else subtotal + iva - isr
     redondo = lambda n: n.quantize(CENTAVOS, ROUND_HALF_UP)
@@ -169,10 +175,7 @@ def _hoja(xml, d):
         xml = _poner(xml, "M45", numero=d["subtotal"])
     else:
         xml = _poner(xml, "M45", formula="SUM(M17:M44)", cache=redondo(subtotal))
-    if d["iva"] is not None:
-        xml = _poner(xml, "M46", numero=d["iva"])
-    else:
-        xml = _poner(xml, "M46", formula="M45*0.16", cache=redondo(iva))
+    xml = _poner(xml, "M46", formula=f"M45*{_num(d['iva_pct'] / 100)}", cache=redondo(iva))
     xml = _poner(xml, "M47", numero=d["isr"]) if d["isr"] is not None else _poner(xml, "M47")
     if d["total"] is not None:
         xml = _poner(xml, "M48", numero=d["total"])

@@ -12,7 +12,7 @@ const UNIDADES = ['PIEZA', 'CAJA', 'PAQUETE', 'JUEGO', 'LITRO', 'KILO', 'METRO',
 const EMPRESAS = ['AUTOMOTRIZ TOLLOCAN S.A. DE C.V.']
 const MAX_LINEAS = 13
 const ANCHO = 820
-const TASA_IVA = 0.16
+const IVA_DEFECTO = '16'
 
 const dos = (n) => String(n).padStart(2, '0')
 
@@ -35,7 +35,7 @@ const vacio = (usuario) => ({
   proveedor: '',
   lineas: [linea()],
   subtotal: '',
-  iva: '',
+  ivaPct: IVA_DEFECTO,
   isr: '',
   total: '',
   observaciones: '',
@@ -60,13 +60,31 @@ function Celda({ c, r, clase = '', children }) {
   )
 }
 
-export default function Requisicion({ usuario, departamentos }) {
+export default function Requisicion({ usuario, departamentos, prefill, onUsado }) {
   const toast = useToast()
   const [f, setF] = usePersistido('requisicion:' + usuario.username, vacio(usuario))
   const lienzo = useRef(null)
   const hoja = useRef(null)
   const [medidas, setMedidas] = useState({ escala: 1, alto: 0 })
   const [generando, setGenerando] = useState(false)
+  const [completar, setCompletar] = useState(true)
+
+  useEffect(() => {
+    if (!prefill || prefill.length === 0) return
+    const usadas = f.lineas.filter((l) => l.descripcion.trim() || String(l.precio).trim() !== '')
+    const ya = usadas.map((l) => l.notaId).filter(Boolean)
+    const porAgregar = prefill.filter((p) => !ya.includes(p.notaId))
+    const nuevas = porAgregar.slice(0, Math.max(0, MAX_LINEAS - usadas.length))
+    const omitidas = porAgregar.length - nuevas.length
+    const lineas = [...usadas, ...nuevas]
+    setF({ ...f, lineas: lineas.length ? lineas : [linea()] })
+    if (omitidas > 0) {
+      toast.error(`La requisición admite ${MAX_LINEAS} artículos; quedaron fuera ${omitidas}`)
+    } else if (nuevas.length > 0) {
+      toast.ok(`${nuevas.length} artículo(s) agregados a la requisición`)
+    }
+    onUsado()
+  }, [prefill])
 
   useEffect(() => {
     const medir = () => {
@@ -109,8 +127,8 @@ export default function Requisicion({ usuario, departamentos }) {
   const filas = f.lineas.map((l) => ({ ...l, importe: num(l.cantidad) * num(l.precio) }))
   const subAuto = filas.reduce((s, l) => s + l.importe, 0)
   const subtotal = manual(f.subtotal) ?? subAuto
-  const ivaAuto = subtotal * TASA_IVA
-  const iva = manual(f.iva) ?? ivaAuto
+  const ivaPct = f.ivaPct ?? IVA_DEFECTO
+  const iva = subtotal * (num(ivaPct) / 100)
   const isr = manual(f.isr) ?? 0
   const totalAuto = subtotal + iva - isr
   const total = manual(f.total) ?? totalAuto
@@ -121,6 +139,15 @@ export default function Requisicion({ usuario, departamentos }) {
   if (!f.solicitante.trim()) faltan.push('solicitado por')
   if (!f.fechaSolicitud) faltan.push('fecha de solicitud')
   if (!f.lineas.some((l) => l.descripcion.trim())) faltan.push('al menos un artículo con descripción')
+
+  const ligadas = f.lineas.map((l) => l.notaId).filter(Boolean)
+
+  const completarPendientes = async () => {
+    const resultados = await Promise.allSettled(ligadas.map((id) => api.deleteNotaCompra(id)))
+    const quitadas = resultados.filter((r) => r.status === 'fulfilled').length
+    setF((actual) => ({ ...actual, lineas: actual.lineas.map(({ notaId, ...resto }) => resto) }))
+    toast.ok(`${quitadas} artículo(s) quitados del checklist de pendientes`)
+  }
 
   const descargar = async () => {
     if (faltan.length) {
@@ -139,6 +166,7 @@ export default function Requisicion({ usuario, departamentos }) {
       enlace.remove()
       URL.revokeObjectURL(url)
       toast.ok('Excel generado: ' + nombre)
+      if (completar && ligadas.length > 0) await completarPendientes()
     } catch (ex) {
       toast.error(ex.message)
     } finally {
@@ -151,14 +179,6 @@ export default function Requisicion({ usuario, departamentos }) {
       <section className="card req-form">
         <div className="toolbar">
           <h2>Requisición de compra</h2>
-          <div className="req-acciones">
-            <button type="button" className="btn secondary" onClick={limpiar}>
-              <Eraser size={16} /> Limpiar
-            </button>
-            <button type="button" className="btn" onClick={descargar} disabled={generando}>
-              <Download size={16} /> {generando ? 'Generando…' : 'Descargar Excel'}
-            </button>
-          </div>
         </div>
 
         <h3 className="req-sub">Datos generales</h3>
@@ -249,15 +269,15 @@ export default function Requisicion({ usuario, departamentos }) {
         </button>
 
         <h3 className="req-sub">Totales <span className="contador">opcionales</span></h3>
-        <p className="hint">Si los dejas vacíos se calculan solos. Si escribes un valor, ese es el que se usa.</p>
+        <p className="hint">Subtotal, Ret. ISR y Total se calculan solos si los dejas vacíos. El IVA se calcula con el porcentaje que pongas.</p>
         <div className="fila-2">
           <label>Subtotal
             <input type="number" min="0" step="0.01" value={f.subtotal} placeholder={dinero(subAuto)}
               onChange={set('subtotal')} />
           </label>
-          <label>IVA
-            <input type="number" min="0" step="0.01" value={f.iva} placeholder={dinero(ivaAuto)}
-              onChange={set('iva')} />
+          <label>IVA (%)
+            <input type="number" min="0" max="100" step="any" value={ivaPct}
+              onChange={set('ivaPct')} />
           </label>
           <label>Ret. ISR
             <input type="number" min="0" step="0.01" value={f.isr} placeholder={dinero(0)}
@@ -269,10 +289,31 @@ export default function Requisicion({ usuario, departamentos }) {
           </label>
         </div>
 
+        <p className="hint">IVA calculado: <strong>{dinero(iva)}</strong> ({num(ivaPct)}% de {dinero(subtotal)})</p>
+
         <h3 className="req-sub">Observaciones</h3>
         <label>
           <textarea rows="3" value={f.observaciones} onChange={set('observaciones')} placeholder="Opcional" />
         </label>
+
+        {ligadas.length > 0 && (
+          <div className="req-aviso">
+            <strong>{ligadas.length} artículo(s) vienen del checklist de pendientes.</strong>
+            <label className="req-aviso-check">
+              <input type="checkbox" checked={completar} onChange={(e) => setCompletar(e.target.checked)} />
+              <span>Marcar la requisición como completa al descargarla: se eliminarán de la lista de pendientes.</span>
+            </label>
+          </div>
+        )}
+
+        <div className="req-acciones req-acciones-pie">
+          <button type="button" className="btn secondary" onClick={limpiar}>
+            <Eraser size={16} /> Limpiar
+          </button>
+          <button type="button" className="btn" onClick={descargar} disabled={generando}>
+            <Download size={16} /> {generando ? 'Generando…' : 'Descargar Excel'}
+          </button>
+        </div>
       </section>
 
       <aside className="req-previa">

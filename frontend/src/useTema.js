@@ -40,8 +40,10 @@ export default function useTema() {
     return () => mq.removeEventListener('change', aplicar)
   }, [tema])
 
-  const setTema = useCallback((t) => {
-    try { window.localStorage.setItem(CLAVE, JSON.stringify(t)) } catch {}
+  const setTema = useCallback((t, persistir = true) => {
+    if (persistir) {
+      try { window.localStorage.setItem(CLAVE, JSON.stringify(t)) } catch {}
+    }
     window.dispatchEvent(new CustomEvent(EVENTO, { detail: t }))
   }, [])
 
