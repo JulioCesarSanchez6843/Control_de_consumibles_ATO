@@ -12,14 +12,15 @@ import Ajustes from './components/Ajustes'
 import Perfil from './components/Perfil'
 import Requisicion from './components/Requisicion'
 import PendientesCompra from './components/PendientesCompra'
+import Frecuentes from './components/Frecuentes'
 import useTema from './useTema'
 import { aplicar, normalizar } from './preferencias'
-import { Boxes, CheckCheck, ClipboardList, FileText, History as IcoHistorial, ListChecks, PackageMinus, PackagePlus, Printer, ShieldCheck, ShoppingCart, Users, Warehouse } from 'lucide-react'
+import { Boxes, CheckCheck, ClipboardList, FileText, History as IcoHistorial, ListChecks, PackageMinus, PackagePlus, Printer, ShieldCheck, ShoppingCart, Star, Users, Warehouse } from 'lucide-react'
 
 const GRUPOS = [
   { nombre: 'Bitácora', icono: ClipboardList, tabs: ['Salidas', 'Entradas'] },
   { nombre: 'Inventarios', icono: Warehouse, tabs: ['Inventario', 'Impresoras'] },
-  { nombre: 'Compras', icono: ShoppingCart, tabs: ['Requisición', 'Por comprar'] },
+  { nombre: 'Compras', icono: ShoppingCart, tabs: ['Requisición', 'Por comprar', 'Frecuentes'] },
   { nombre: 'Equipo TI', icono: ShieldCheck, tabs: ['Usuarios', 'Historial'], admin: true },
 ]
 
@@ -33,6 +34,7 @@ const ICONOS = {
   Usuarios: Users,
   Historial: IcoHistorial,
   'Por comprar': ListChecks,
+  Frecuentes: Star,
 }
 
 function Ico({ t }) {
@@ -237,6 +239,7 @@ export default function App() {
             onUsado={() => setPrefillReq(null)} />
         )}
         {tab === 'Por comprar' && <PendientesCompra usuario={usuario} onRequisicion={pasarARequisicion} />}
+        {tab === 'Frecuentes' && <Frecuentes onRequisicion={pasarARequisicion} filas={prefs.filas} />}
         {tab === 'Ajustes' && (
           <Ajustes prefs={prefs} onPref={guardarPref} onVista={setVista} />
         )}

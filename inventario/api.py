@@ -14,7 +14,8 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from . import auditoria, requisicion, services
-from .models import Actividad, Consumible, Impresora, ImpresoraConsumible, Movimiento, NotaCompra
+from .models import (Actividad, ArticuloFrecuente, Consumible, Impresora, ImpresoraConsumible, Movimiento,
+                     NotaCompra)
 
 
 def _err(msg, status=400):
@@ -502,6 +503,7 @@ def requisicion_excel(request):
         return _err(str(ex))
     except FileNotFoundError:
         return _err("No se encontró la plantilla inventario/plantillas/requisicion.xlsm", 500)
+    _registrar_frecuentes(datos)
     nombre = "Requisicion " + (datos["folio"] or datos["fecha_solicitud"].replace("/", "-")) + ".xlsm"
     nombre = re.sub(r'[\\/:*?"<>|]', "-", nombre)
     resumen = ", ".join(
@@ -647,3 +649,38 @@ def notas_a_requisicion(request):
         auditoria.registrar("nota_requisicion", usuario=request.user, request=request,
                             detalle=f"Pasó a la requisición: {_resumen_nota(n)}")
     return JsonResponse({"ok": True, "registrados": len(notas)})
+
+def _registrar_frecuentes(datos):
+    ahora = timezone.now()
+    for l in datos["lineas"]:
+        clave = " ".join(l["descripcion"].lower().split())[:300]
+        a, _ = ArticuloFrecuente.objects.get_or_create(clave=clave, defaults={"descripcion": l["descripcion"]})
+        a.descripcion = l["descripcion"]
+        a.unidad = l["unidad"] or a.unidad
+        if l["cantidad"] is not None and abs(l["cantidad"]) < 10**7:
+            a.cantidad = l["cantidad"].quantize(Decimal("0.01"))
+        a.proveedor = datos["proveedor"] or a.proveedor
+        a.veces += 1
+        a.ultima_compra = ahora
+        a.save()
+
+
+def _frecuente(a):
+    return {"id": a.pk, "descripcion": a.descripcion, "unidad": a.unidad, "cantidad": _cant(a.cantidad),
+            "proveedor": a.proveedor, "veces": a.veces,
+            "ultima_compra": timezone.localtime(a.ultima_compra).strftime("%Y-%m-%d")}
+
+
+@require_GET
+def frecuentes(request):
+    return JsonResponse([_frecuente(a) for a in ArticuloFrecuente.objects.all()], safe=False)
+
+
+@require_http_methods(["DELETE"])
+def frecuente_detalle(request, pk):
+    try:
+        a = ArticuloFrecuente.objects.get(pk=pk)
+    except ArticuloFrecuente.DoesNotExist:
+        return _err("Artículo no encontrado", 404)
+    a.delete()
+    return JsonResponse({"ok": True})

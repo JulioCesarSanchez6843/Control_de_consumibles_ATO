@@ -23,6 +23,8 @@ urlpatterns = [
     path("movements", api.movimientos),
     path("movements/<int:pk>/anular", api.anular),
     path("requisicion/excel", api.requisicion_excel),
+    path("frequent-items", api.frecuentes),
+    path("frequent-items/<int:pk>", api.frecuente_detalle),
     path("purchase-notes", api.notas_compra),
     path("purchase-notes/requisicion", api.notas_a_requisicion),
     path("purchase-notes/<int:pk>", api.nota_compra_detalle),

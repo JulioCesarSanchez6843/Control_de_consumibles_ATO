@@ -70,5 +70,7 @@ export const api = {
   updateNotaCompra: (id, d) => req(`/purchase-notes/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
   deleteNotaCompra: (id, motivo) => req(`/purchase-notes/${id}${motivo ? '?motivo=' + motivo : ''}`, { method: 'DELETE' }),
   notasARequisicion: (ids) => req('/purchase-notes/requisicion', { method: 'POST', body: JSON.stringify({ ids }) }),
+  frecuentes: () => req('/frequent-items'),
+  deleteFrecuente: (id) => req(`/frequent-items/${id}`, { method: 'DELETE' }),
   actividad: (params) => req('/activity?' + new URLSearchParams(params).toString()),
 }

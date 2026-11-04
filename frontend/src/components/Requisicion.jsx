@@ -56,6 +56,12 @@ export default function Requisicion({ usuario, departamentos, prefill, onUsado }
   const [generando, setGenerando] = useState(false)
   const [completar, setCompletar] = useState(true)
 
+  const [frecuentes, setFrecuentes] = useState([])
+
+  useEffect(() => {
+    api.frecuentes().then(setFrecuentes).catch(() => {})
+  }, [])
+
   useEffect(() => {
     if (!prefill || prefill.length === 0) return
     const usadas = f.lineas.filter((l) => l.descripcion.trim())
@@ -91,6 +97,15 @@ export default function Requisicion({ usuario, departamentos, prefill, onUsado }
 
   const setLinea = (i, campo, valor) =>
     setF({ ...f, lineas: f.lineas.map((l, j) => (j === i ? { ...l, [campo]: valor } : l)) })
+
+  const cambiarDescripcion = (i, valor) => {
+    const clave = valor.trim().toLowerCase()
+    const hallado = frecuentes.find((a) => a.descripcion.toLowerCase() === clave)
+    setF({
+      ...f,
+      lineas: f.lineas.map((l, j) => (j === i ? { ...l, descripcion: valor, ...(hallado ? { unidad: hallado.unidad } : {}) } : l)),
+    })
+  }
 
   const agregar = () => {
     if (f.lineas.length < MAX_LINEAS) setF({ ...f, lineas: [...f.lineas, linea()] })
@@ -221,12 +236,15 @@ export default function Requisicion({ usuario, departamentos, prefill, onUsado }
               <Trash2 size={15} />
             </button>
             <label className="req-desc">Descripción del artículo
-              <input value={l.descripcion} onChange={(e) => setLinea(i, 'descripcion', e.target.value)} />
+              <input list="req-frecuentes" value={l.descripcion} onChange={(e) => cambiarDescripcion(i, e.target.value)} />
             </label>
           </div>
         ))}
         <datalist id="req-unidades">
           {UNIDADES.map((u) => <option key={u} value={u} />)}
+        </datalist>
+        <datalist id="req-frecuentes">
+          {frecuentes.map((a) => <option key={a.id} value={a.descripcion} />)}
         </datalist>
         <button type="button" className="btn secondary" onClick={agregar} disabled={f.lineas.length >= MAX_LINEAS}>
           <Plus size={16} /> Agregar artículo

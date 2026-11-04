@@ -171,3 +171,20 @@ class NotaCompra(models.Model):
 
     def __str__(self):
         return f"{self.item} x {self.cantidad} {self.unidad}"
+
+class ArticuloFrecuente(models.Model):
+    clave = models.CharField(max_length=300, unique=True)
+    descripcion = models.CharField(max_length=300)
+    unidad = models.CharField(max_length=30, default="PIEZA")
+    cantidad = models.DecimalField(max_digits=10, decimal_places=2, default=1)
+    proveedor = models.CharField(max_length=150, blank=True)
+    veces = models.PositiveIntegerField(default=0)
+    ultima_compra = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-veces", "-ultima_compra"]
+        verbose_name = "artículo frecuente"
+        verbose_name_plural = "artículos frecuentes"
+
+    def __str__(self):
+        return f"{self.descripcion} ({self.veces})"
