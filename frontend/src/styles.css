@@ -29,7 +29,7 @@
   --shadow-lg: 0 8px 28px rgba(0, 0, 0, .55);
   --nav-h: 68px;
   --sub-h: 46px;
-  --side-w: 88px;
+  --side-w: 104px;
   --glow: rgba(195, 0, 47, .13);
   --glow-login: rgba(195, 0, 47, .22);
   --input-bg: #0e0e11;
@@ -214,7 +214,8 @@ tbody tr.fila.agotado td:first-child { box-shadow: inset 3px 0 0 var(--primary);
 .shell.sin-sub { grid-template-columns: minmax(0, 1fr); }
 .subnav { position: sticky; top: var(--nav-h); z-index: 15; display: flex; flex-direction: column; align-items: stretch; gap: 6px; padding: 12px 8px; height: calc(100vh - var(--nav-h)); overflow-y: auto; background: var(--sub-bg); border-right: 1px solid var(--border); box-shadow: var(--sub-shadow); animation: entrar .22s ease backwards; }
 .subnav-titulo { display: none; }
-.subnav button { position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 10px 4px; background: none; border: none; border-radius: 10px; color: var(--text-soft); font: inherit; font-size: .7rem; font-weight: 500; line-height: 1.15; text-align: center; cursor: pointer; transition: color .15s, background .15s, box-shadow .15s; }
+.subnav button { position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 0; padding: 10px 4px; background: none; border: none; border-radius: 10px; color: var(--text-soft); font: inherit; font-size: .7rem; font-weight: 500; line-height: 1.15; text-align: center; cursor: pointer; transition: color .15s, background .15s, box-shadow .15s; }
+.subnav button span { max-width: 100%; overflow-wrap: anywhere; }
 .subnav button:hover { color: var(--text); background: var(--sub-hover); }
 .subnav button.active { color: var(--text); font-weight: 600; background: var(--primary-soft); box-shadow: inset 3px 0 0 var(--primary); }
 .subnav button.active svg { color: var(--accent); }
@@ -436,17 +437,20 @@ tbody tr.fila.agotado td:first-child { box-shadow: inset 3px 0 0 var(--primary);
 .paginador-botones .btn { padding: 6px 10px; }
 
 
-.req { display: grid; grid-template-columns: minmax(340px, 440px) minmax(0, 1fr); gap: 18px; align-items: start; }
+.req { display: grid; grid-template-columns: minmax(360px, 480px) minmax(0, 1fr); gap: 18px; align-items: start; }
 .req-form { overflow-x: visible; }
 .req-sub { display: flex; align-items: center; gap: 8px; margin: 22px 0 10px; padding-left: 9px; border-left: 3px solid var(--primary); font-size: .92rem; }
 .req-acciones { display: flex; gap: 10px; flex-wrap: wrap; }
 .req-acciones-pie { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--border-soft); justify-content: flex-end; }
 .req textarea { width: 100%; margin-top: 4px; padding: 9px 11px; border: 1px solid var(--border-strong); border-radius: 9px; font: inherit; font-size: .95rem; color: var(--text); background: var(--input-bg); resize: vertical; }
 .req textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .28); }
-.req-linea { display: grid; grid-template-columns: 90px 1fr 1fr; gap: 0 10px; padding: 12px 12px 4px; margin-bottom: 10px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--surface-alt); }
+.req-linea { display: grid; grid-template-columns: 96px 1fr auto; gap: 0 10px; align-items: end; padding: 12px 12px 0; margin-bottom: 10px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--surface-alt); }
 .req-desc { grid-column: 1 / -1; }
-.req-linea-pie { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: .85rem; color: var(--text-soft); }
-.req-linea-pie .btn { padding: 5px 9px; }
+.req-quitar { margin-bottom: 12px; padding: 9px 12px; }
+.req-form .fila-2 { align-items: end; }
+.req-chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 16px; }
+.req-chips .chip-op { display: flex; align-items: center; justify-content: center; min-height: 40px; padding: 6px 10px; text-align: center; font-size: .8rem; line-height: 1.2; }
+.opc { color: var(--text-muted); font-weight: 400; font-size: .78rem; }
 .req-previa { position: sticky; top: calc(var(--nav-h) + 16px); min-width: 0; max-height: calc(100vh - var(--nav-h) - 32px); overflow: auto; }
 .req-previa-cab { margin-bottom: 8px; padding-left: 11px; border-left: 3px solid var(--primary); font-weight: 700; }
 .req-lienzo { width: 100%; overflow: hidden; background: #fff; border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: var(--shadow); }
@@ -465,6 +469,7 @@ tbody tr.fila.agotado td:first-child { box-shadow: inset 3px 0 0 var(--primary);
 .rh .valor-g { font-size: 13px; font-weight: 700; }
 .rh.empresa { align-items: flex-start; justify-content: flex-start; padding-top: 3px; }
 .rh.empresa .valor-g { align-self: center; margin-top: 8px; }
+.rh.empresa .domicilio { align-self: center; margin-top: 3px; font-size: 8px; text-align: center; }
 .rh.etq-c { justify-content: flex-start; padding-top: 3px; }
 .rh.cat { align-items: center; padding: 1px 2px; font-size: 6.5px; line-height: 1.15; text-align: center; }
 .rh.cruz { align-items: center; font-size: 14px; font-weight: 700; }
@@ -597,3 +602,14 @@ tbody tr.fila.agotado td:first-child { box-shadow: inset 3px 0 0 var(--primary);
 .req-aviso { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; padding: 12px 14px; border: 1px dashed var(--primary); border-radius: 10px; background: var(--primary-soft); font-size: .88rem; color: var(--text); }
 .req-aviso-check { display: flex; align-items: flex-start; gap: 10px; margin: 0; color: var(--text-soft); cursor: pointer; }
 .req-aviso-check input { width: 18px; height: 18px; margin: 2px 0 0; padding: 0; flex: none; accent-color: var(--primary); }
+
+.chk-pagina { max-width: 1240px; }
+.chk-papel { min-height: 62vh; }
+.chk-titulo { font-size: 2.1rem; }
+.chk-subtitulo { max-width: 640px; font-size: .92rem; }
+.chk-cabecera { padding-top: 26px; padding-bottom: 18px; }
+.chk-item { min-height: 72px; padding-top: 16px; padding-bottom: 16px; }
+.chk-nombre { font-size: 1.3rem; }
+.chk-dato { padding: 2px 11px; font-size: .84rem; }
+.chk-desc { font-size: .92rem; }
+.chk-lista { padding-bottom: 10px; }

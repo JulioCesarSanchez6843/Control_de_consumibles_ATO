@@ -68,6 +68,7 @@ export const api = {
   notasCompra: () => req('/purchase-notes'),
   addNotaCompra: (d) => req('/purchase-notes', { method: 'POST', body: JSON.stringify(d) }),
   updateNotaCompra: (id, d) => req(`/purchase-notes/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
-  deleteNotaCompra: (id) => req(`/purchase-notes/${id}`, { method: 'DELETE' }),
+  deleteNotaCompra: (id, motivo) => req(`/purchase-notes/${id}${motivo ? '?motivo=' + motivo : ''}`, { method: 'DELETE' }),
+  notasARequisicion: (ids) => req('/purchase-notes/requisicion', { method: 'POST', body: JSON.stringify({ ids }) }),
   actividad: (params) => req('/activity?' + new URLSearchParams(params).toString()),
 }

@@ -9,10 +9,11 @@ const CATEGORIAS = [
   'REFACCIONES', 'SERVICIO', 'ESTEREOS Y PELICULAS', 'H Y P', 'SEGURIDAD', 'EQUIPO DE COMPUTO', 'EVENTOS',
 ]
 const UNIDADES = ['PIEZA', 'CAJA', 'PAQUETE', 'JUEGO', 'LITRO', 'KILO', 'METRO', 'SERVICIO']
-const EMPRESAS = ['AUTOMOTRIZ TOLLOCAN S.A. DE C.V.']
+const EMPRESA = 'AUTOMOTRIZ TOLLOCAN S.A. DE C.V.'
+const DOMICILIO = 'PASEO TOLLOCAN KM 4.8 COL SAN JERONIMO CHICAHUALCO, METEPEC, ESTADO DE MEXICO 52170 RFC : 860625BI5'
 const MAX_LINEAS = 13
 const ANCHO = 820
-const IVA_DEFECTO = '16'
+const CERO = '$0.00'
 
 const dos = (n) => String(n).padStart(2, '0')
 
@@ -21,10 +22,9 @@ const hoy = () => {
   return `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}`
 }
 
-const linea = () => ({ cantidad: '1', unidad: 'PIEZA', descripcion: '', precio: '' })
+const linea = () => ({ cantidad: '1', unidad: 'PIEZA', descripcion: '' })
 
 const vacio = (usuario) => ({
-  empresa: EMPRESAS[0],
   folio: '',
   departamento: '',
   solicitante: usuario.nombre || usuario.username || '',
@@ -34,21 +34,8 @@ const vacio = (usuario) => ({
   presupuesto: '',
   proveedor: '',
   lineas: [linea()],
-  subtotal: '',
-  ivaPct: IVA_DEFECTO,
-  isr: '',
-  total: '',
   observaciones: '',
 })
-
-const num = (v) => {
-  const n = parseFloat(String(v).replace(/,/g, ''))
-  return Number.isFinite(n) ? n : 0
-}
-
-const manual = (v) => (String(v).trim() === '' ? null : num(v))
-
-const dinero = (n) => '$' + n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 const fecha = (iso) => (iso ? iso.split('-').reverse().join('/') : '')
 
@@ -71,7 +58,7 @@ export default function Requisicion({ usuario, departamentos, prefill, onUsado }
 
   useEffect(() => {
     if (!prefill || prefill.length === 0) return
-    const usadas = f.lineas.filter((l) => l.descripcion.trim() || String(l.precio).trim() !== '')
+    const usadas = f.lineas.filter((l) => l.descripcion.trim())
     const ya = usadas.map((l) => l.notaId).filter(Boolean)
     const porAgregar = prefill.filter((p) => !ya.includes(p.notaId))
     const nuevas = porAgregar.slice(0, Math.max(0, MAX_LINEAS - usadas.length))
@@ -124,17 +111,7 @@ export default function Requisicion({ usuario, departamentos, prefill, onUsado }
     setF(vacio(usuario))
   }
 
-  const filas = f.lineas.map((l) => ({ ...l, importe: num(l.cantidad) * num(l.precio) }))
-  const subAuto = filas.reduce((s, l) => s + l.importe, 0)
-  const subtotal = manual(f.subtotal) ?? subAuto
-  const ivaPct = f.ivaPct ?? IVA_DEFECTO
-  const iva = subtotal * (num(ivaPct) / 100)
-  const isr = manual(f.isr) ?? 0
-  const totalAuto = subtotal + iva - isr
-  const total = manual(f.total) ?? totalAuto
-
   const faltan = []
-  if (!f.empresa.trim()) faltan.push('empresa')
   if (!f.departamento.trim()) faltan.push('departamento solicitante')
   if (!f.solicitante.trim()) faltan.push('solicitado por')
   if (!f.fechaSolicitud) faltan.push('fecha de solicitud')
@@ -143,7 +120,7 @@ export default function Requisicion({ usuario, departamentos, prefill, onUsado }
   const ligadas = f.lineas.map((l) => l.notaId).filter(Boolean)
 
   const completarPendientes = async () => {
-    const resultados = await Promise.allSettled(ligadas.map((id) => api.deleteNotaCompra(id)))
+    const resultados = await Promise.allSettled(ligadas.map((id) => api.deleteNotaCompra(id, 'requisicion')))
     const quitadas = resultados.filter((r) => r.status === 'fulfilled').length
     setF((actual) => ({ ...actual, lineas: actual.lineas.map(({ notaId, ...resto }) => resto) }))
     toast.ok(`${quitadas} artículo(s) quitados del checklist de pendientes`)
@@ -182,37 +159,40 @@ export default function Requisicion({ usuario, departamentos, prefill, onUsado }
         </div>
 
         <h3 className="req-sub">Datos generales</h3>
-        <label>Empresa *
-          <input list="req-empresas" value={f.empresa} onChange={set('empresa')} />
-        </label>
-        <datalist id="req-empresas">
-          {EMPRESAS.map((e) => <option key={e} value={e} />)}
-        </datalist>
         <div className="fila-2">
           <label>Folio
             <input value={f.folio} onChange={set('folio')} placeholder="Ej. SIS-2026-0001" />
           </label>
+          <label>Fecha de solicitud *
+            <input type="date" value={f.fechaSolicitud} onChange={set('fechaSolicitud')} />
+          </label>
+        </div>
+        <div className="fila-2">
           <label>Departamento solicitante *
             <input list="req-deptos" value={f.departamento} onChange={set('departamento')} />
+          </label>
+          <label>Solicitado por *
+            <input value={f.solicitante} onChange={set('solicitante')} />
           </label>
         </div>
         <datalist id="req-deptos">
           {(departamentos || []).map((d) => <option key={d} value={d} />)}
         </datalist>
-        <label>Solicitado por *
-          <input value={f.solicitante} onChange={set('solicitante')} />
-        </label>
         <div className="fila-2">
-          <label>Fecha de solicitud *
-            <input type="date" value={f.fechaSolicitud} onChange={set('fechaSolicitud')} />
-          </label>
-          <label>Fecha en que se necesita
+          <label>Fecha en que se necesita <span className="opc">(opcional)</span>
             <input type="date" value={f.fechaNecesita} onChange={set('fechaNecesita')} />
+          </label>
+          <label>Presupuesto autorizado por consejo <span className="opc">(opcional)</span>
+            <select value={f.presupuesto} onChange={set('presupuesto')}>
+              <option value="">—</option>
+              <option value="SÍ">Sí</option>
+              <option value="NO">No</option>
+            </select>
           </label>
         </div>
 
         <h3 className="req-sub">Tipo de compra</h3>
-        <div className="opciones-fila">
+        <div className="req-chips">
           {CATEGORIAS.map((c) => (
             <button type="button" key={c} aria-pressed={f.categorias.includes(c)}
               className={'chip-op' + (f.categorias.includes(c) ? ' activo' : '')}
@@ -221,21 +201,12 @@ export default function Requisicion({ usuario, departamentos, prefill, onUsado }
             </button>
           ))}
         </div>
-        <div className="fila-2">
-          <label>Entra en presupuesto autorizado por consejo
-            <select value={f.presupuesto} onChange={set('presupuesto')}>
-              <option value="">—</option>
-              <option value="SÍ">Sí</option>
-              <option value="NO">No</option>
-            </select>
-          </label>
-          <label>Proveedor sugerido
-            <input value={f.proveedor} onChange={set('proveedor')} placeholder="Opcional" />
-          </label>
-        </div>
+        <label>Proveedor sugerido <span className="opc">(opcional)</span>
+          <input value={f.proveedor} onChange={set('proveedor')} />
+        </label>
 
         <h3 className="req-sub">Artículos <span className="contador">{f.lineas.length}/{MAX_LINEAS}</span></h3>
-        {filas.map((l, i) => (
+        {f.lineas.map((l, i) => (
           <div className="req-linea" key={i}>
             <label>Cantidad
               <input type="number" min="0" step="any" value={l.cantidad}
@@ -245,20 +216,13 @@ export default function Requisicion({ usuario, departamentos, prefill, onUsado }
               <input list="req-unidades" value={l.unidad}
                 onChange={(e) => setLinea(i, 'unidad', e.target.value)} />
             </label>
-            <label>Precio unitario
-              <input type="number" min="0" step="0.01" value={l.precio} placeholder="Opcional"
-                onChange={(e) => setLinea(i, 'precio', e.target.value)} />
-            </label>
+            <button type="button" className="btn secondary req-quitar" disabled={f.lineas.length === 1}
+              onClick={() => quitar(i)} aria-label="Quitar artículo">
+              <Trash2 size={15} />
+            </button>
             <label className="req-desc">Descripción del artículo
               <input value={l.descripcion} onChange={(e) => setLinea(i, 'descripcion', e.target.value)} />
             </label>
-            <div className="req-linea-pie">
-              <span>Importe: <strong>{l.precio === '' ? '—' : dinero(l.importe)}</strong></span>
-              <button type="button" className="btn secondary" disabled={f.lineas.length === 1}
-                onClick={() => quitar(i)} aria-label="Quitar artículo">
-                <Trash2 size={15} />
-              </button>
-            </div>
           </div>
         ))}
         <datalist id="req-unidades">
@@ -268,32 +232,9 @@ export default function Requisicion({ usuario, departamentos, prefill, onUsado }
           <Plus size={16} /> Agregar artículo
         </button>
 
-        <h3 className="req-sub">Totales <span className="contador">opcionales</span></h3>
-        <p className="hint">Subtotal, Ret. ISR y Total se calculan solos si los dejas vacíos. El IVA se calcula con el porcentaje que pongas.</p>
-        <div className="fila-2">
-          <label>Subtotal
-            <input type="number" min="0" step="0.01" value={f.subtotal} placeholder={dinero(subAuto)}
-              onChange={set('subtotal')} />
-          </label>
-          <label>IVA (%)
-            <input type="number" min="0" max="100" step="any" value={ivaPct}
-              onChange={set('ivaPct')} />
-          </label>
-          <label>Ret. ISR
-            <input type="number" min="0" step="0.01" value={f.isr} placeholder={dinero(0)}
-              onChange={set('isr')} />
-          </label>
-          <label>Total
-            <input type="number" step="0.01" value={f.total} placeholder={dinero(totalAuto)}
-              onChange={set('total')} />
-          </label>
-        </div>
-
-        <p className="hint">IVA calculado: <strong>{dinero(iva)}</strong> ({num(ivaPct)}% de {dinero(subtotal)})</p>
-
-        <h3 className="req-sub">Observaciones</h3>
+        <h3 className="req-sub">Observaciones <span className="contador">opcional</span></h3>
         <label>
-          <textarea rows="3" value={f.observaciones} onChange={set('observaciones')} placeholder="Opcional" />
+          <textarea rows="3" value={f.observaciones} onChange={set('observaciones')} />
         </label>
 
         {ligadas.length > 0 && (
@@ -334,7 +275,8 @@ export default function Requisicion({ usuario, departamentos, prefill, onUsado }
 
               <Celda c="1 / 12" r="3 / 6" clase="empresa">
                 <span className="etq">EMPRESA:</span>
-                <strong className="valor-g">{f.empresa}</strong>
+                <strong className="valor-g">{EMPRESA}</strong>
+                <span className="domicilio">{DOMICILIO}</span>
               </Celda>
               <Celda c="12 / 14" r="3" clase="etq-c"><span className="etq">DEPARTAMENTO:</span></Celda>
               <Celda c="12 / 14" r="4 / 6" clase="centro"><span className="valor-g">{f.departamento}</span></Celda>
@@ -382,30 +324,26 @@ export default function Requisicion({ usuario, departamentos, prefill, onUsado }
 
               <Celda c="1 / 14" r="19 / 36" clase="caja" />
               {Array.from({ length: MAX_LINEAS }, (_, i) => {
-                const l = filas[i]
+                const l = f.lineas[i]
                 const r = String(19 + i)
-                const usada = !!l && (l.descripcion.trim() !== '' || l.precio !== '')
+                const usada = !!l && l.descripcion.trim() !== ''
                 return [
                   <Celda key={'a' + i} c="1" r={r} clase="it der">{usada ? l.cantidad : ''}</Celda>,
                   <Celda key={'b' + i} c="2 / 4" r={r} clase="it centro">{usada ? l.unidad : ''}</Celda>,
                   <Celda key={'c' + i} c="4 / 10" r={r} clase="it izq">{usada ? l.descripcion : ''}</Celda>,
-                  <Celda key={'d' + i} c="10 / 13" r={r} clase="it der">
-                    {usada && l.precio !== '' ? dinero(num(l.precio)) : ''}
-                  </Celda>,
-                  <Celda key={'e' + i} c="13" r={r} clase="it der ult">
-                    {usada && l.precio !== '' ? dinero(l.importe) : ''}
-                  </Celda>,
+                  <Celda key={'d' + i} c="10 / 13" r={r} clase="it der">{usada ? CERO : ''}</Celda>,
+                  <Celda key={'e' + i} c="13" r={r} clase="it der ult">{usada ? CERO : ''}</Celda>,
                 ]
               })}
 
               <Celda c="10 / 13" r="32" clase="sb der"><span className="etq-t">SUBTOTAL:</span></Celda>
-              <Celda c="13" r="32" clase="der">{dinero(subtotal)}</Celda>
+              <Celda c="13" r="32" clase="der">{CERO}</Celda>
               <Celda c="10 / 13" r="33" clase="sb der"><span className="etq-t">IVA:</span></Celda>
-              <Celda c="13" r="33" clase="der">{dinero(iva)}</Celda>
+              <Celda c="13" r="33" clase="der">{CERO}</Celda>
               <Celda c="10 / 13" r="34" clase="sb der"><span className="etq-t">RET ISR:</span></Celda>
-              <Celda c="13" r="34" clase="der">{dinero(isr)}</Celda>
+              <Celda c="13" r="34" clase="der">{CERO}</Celda>
               <Celda c="10 / 13" r="35" clase="sb der"><span className="etq-t">TOTAL:</span></Celda>
-              <Celda c="13" r="35" clase="der"><strong>{dinero(total)}</strong></Celda>
+              <Celda c="13" r="35" clase="der"><strong>{CERO}</strong></Celda>
 
               <Celda c="1 / 14" r="36" clase="obs">
                 <span className="etq">OBSERVACIONES:</span>

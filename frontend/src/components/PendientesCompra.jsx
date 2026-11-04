@@ -4,9 +4,6 @@ import { api } from '../api'
 import { useToast } from './Toast'
 import PendienteModal from './PendienteModal'
 
-const dinero = (n) => '$' + n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-const importe = (n) => (n.costo == null ? 0 : n.cantidad * n.costo)
-
 const idsEnRequisicion = (usuario) => {
   try {
     const f = JSON.parse(window.localStorage.getItem('requisicion:' + usuario.username))
@@ -36,8 +33,6 @@ export default function PendientesCompra({ usuario, onRequisicion }) {
   const seleccionables = lista.filter((n) => !enReq.includes(n.id))
   const elegidos = lista.filter((n) => sel.includes(n.id) && !enReq.includes(n.id))
   const todos = seleccionables.length > 0 && elegidos.length === seleccionables.length
-  const totalLista = lista.reduce((s, n) => s + importe(n), 0)
-  const totalElegido = elegidos.reduce((s, n) => s + importe(n), 0)
 
   const alternar = (id) => setSel((actual) => (actual.includes(id) ? actual.filter((x) => x !== id) : [...actual, id]))
 
@@ -73,7 +68,6 @@ export default function PendientesCompra({ usuario, onRequisicion }) {
       cantidad: String(n.cantidad),
       unidad: n.unidad,
       descripcion: (n.descripcion ? `${n.item} - ${n.descripcion}` : n.item).slice(0, 300),
-      precio: n.costo == null ? '' : String(n.costo),
     })))
   }
 
@@ -135,8 +129,6 @@ export default function PendientesCompra({ usuario, onRequisicion }) {
                       <span className="chk-nombre">{n.item}</span>
                       <div className="chk-datos">
                         <span className="chk-dato">{n.cantidad} {n.unidad}</span>
-                        {n.costo != null && <span className="chk-dato">{dinero(n.costo)} c/u</span>}
-                        {n.costo != null && <span className="chk-dato fuerte">{dinero(importe(n))}</span>}
                         {ligado && <span className="chk-dato req"><FileText size={12} /> En la requisición</span>}
                         {n.link && (
                           <a className="link" href={n.link} target="_blank" rel="noreferrer noopener">
@@ -160,16 +152,6 @@ export default function PendientesCompra({ usuario, onRequisicion }) {
                 )
               })}
             </ul>
-          )}
-
-          {lista.length > 0 && (
-            <footer className="chk-pie">
-              <div className="chk-nota">
-                <div><span>Seleccionado</span><span>{dinero(totalElegido)}</span></div>
-                <div className="total"><span>Total pendiente</span><span>{dinero(totalLista)}</span></div>
-              </div>
-              <p className="chk-pie-hint">Importes estimados, sin IVA.</p>
-            </footer>
           )}
         </div>
       </section>

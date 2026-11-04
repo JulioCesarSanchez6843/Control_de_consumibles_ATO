@@ -135,6 +135,11 @@ export default function App() {
     setTab('Salidas')
   }
 
+  const recibir = (consumable_id) => {
+    setPrefillEntrada({ consumable_id })
+    setTab('Entradas')
+  }
+
   const pasarARequisicion = (lineas) => {
     setPrefillReq(lineas)
     setTab('Requisición')

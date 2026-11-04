@@ -51,11 +51,8 @@ def _fecha(valor, nombre, obligatoria):
 
 
 def normalizar(d):
-    empresa = _txt(d, "empresa")
     departamento = _txt(d, "departamento")
     solicitante = _txt(d, "solicitante")
-    if not empresa:
-        raise ValueError("Falta la empresa")
     if not departamento:
         raise ValueError("Falta el departamento solicitante")
     if not solicitante:
@@ -65,27 +62,18 @@ def normalizar(d):
         if not isinstance(l, dict):
             continue
         descripcion = _txt(l, "descripcion", 300)
-        precio = _dec(l.get("precio"), "El precio unitario")
-        if not descripcion and precio is None:
+        if not descripcion:
             continue
         lineas.append({
             "cantidad": _dec(l.get("cantidad"), "La cantidad"),
             "unidad": _txt(l, "unidad", 30).upper(),
             "descripcion": descripcion,
-            "precio": precio,
         })
-    if not any(l["descripcion"] for l in lineas):
+    if not lineas:
         raise ValueError("Agrega al menos un artículo con descripción")
     categorias = d.get("categorias") if isinstance(d.get("categorias"), list) else []
     presupuesto = _txt(d, "presupuesto", 5).upper()
-    if "ivaPct" in d:
-        iva_pct = _dec(d.get("ivaPct"), "El porcentaje de IVA") or Decimal(0)
-    else:
-        iva_pct = IVA_DEFECTO
-    if iva_pct < 0 or iva_pct > 100:
-        raise ValueError("El porcentaje de IVA debe estar entre 0 y 100")
     return {
-        "empresa": empresa,
         "folio": _txt(d, "folio", 40),
         "departamento": departamento.upper(),
         "solicitante": solicitante,
@@ -95,10 +83,6 @@ def normalizar(d):
         "presupuesto": presupuesto if presupuesto in ("SÍ", "NO") else "",
         "proveedor": _txt(d, "proveedor", 150),
         "lineas": lineas,
-        "subtotal": _dec(d.get("subtotal"), "El subtotal"),
-        "iva_pct": iva_pct,
-        "isr": _dec(d.get("isr"), "La retención de ISR"),
-        "total": _dec(d.get("total"), "El total"),
         "observaciones": re.sub(r"\s*\n\s*", " ", _limpio(d.get("observaciones")))[:600],
     }
 
@@ -128,11 +112,10 @@ def _poner(xml, ref, texto=None, numero=None, formula=None, cache=None):
 def _con_etiqueta(etiqueta, valor):
     return f"{etiqueta} {valor}" if valor else etiqueta
 
-
 def _hoja(xml, d):
     xml = _poner(xml, "K2", texto=d["folio"]) if d["folio"] else _poner(xml, "K2")
-    xml = _poner(xml, "D3", texto=d["empresa"])
-    xml = _poner(xml, "D4")
+    xml = _poner(xml, "K2", texto=d["folio"]) if d["folio"] else _poner(xml, "K2")
+    xml = _poner(xml, "L4", texto=d["departamento"])
     xml = _poner(xml, "L4", texto=d["departamento"])
     xml = _poner(xml, "A6", texto=_con_etiqueta("DEPARTAMENTO SOLICITANTE:", d["departamento"]))
     xml = _poner(xml, "A8", texto=_con_etiqueta("SOLICITADO POR:", d["solicitante"]))
@@ -146,7 +129,6 @@ def _hoja(xml, d):
     xml = _poner(xml, "A14", texto=_con_etiqueta("ENTRA EN PRESUPUESTO AUTORIZADO POR CONSEJO:", d["presupuesto"]))
     xml = _poner(xml, "A16", texto=_con_etiqueta("PROVEEDOR SUGERIDO:", d["proveedor"]))
 
-    subtotal_auto = Decimal(0)
     for i, fila in enumerate(FILAS):
         if i >= len(d["lineas"]):
             for col in "ACDKM":
@@ -156,31 +138,8 @@ def _hoja(xml, d):
         xml = _poner(xml, f"A{fila}", numero=l["cantidad"]) if l["cantidad"] is not None else _poner(xml, f"A{fila}")
         xml = _poner(xml, f"C{fila}", texto=l["unidad"]) if l["unidad"] else _poner(xml, f"C{fila}")
         xml = _poner(xml, f"D{fila}", texto=l["descripcion"]) if l["descripcion"] else _poner(xml, f"D{fila}")
-        if l["precio"] is None:
-            xml = _poner(xml, f"K{fila}")
-            xml = _poner(xml, f"M{fila}")
-            continue
-        importe = (l["cantidad"] or Decimal(0)) * l["precio"]
-        subtotal_auto += importe
-        xml = _poner(xml, f"K{fila}", numero=l["precio"])
-        xml = _poner(xml, f"M{fila}", formula=f"A{fila}*K{fila}", cache=importe.quantize(CENTAVOS, ROUND_HALF_UP))
-
-    subtotal = d["subtotal"] if d["subtotal"] is not None else subtotal_auto
-    iva = subtotal * d["iva_pct"] / 100
-    isr = d["isr"] if d["isr"] is not None else Decimal(0)
-    total = d["total"] if d["total"] is not None else subtotal + iva - isr
-    redondo = lambda n: n.quantize(CENTAVOS, ROUND_HALF_UP)
-
-    if d["subtotal"] is not None:
-        xml = _poner(xml, "M45", numero=d["subtotal"])
-    else:
-        xml = _poner(xml, "M45", formula="SUM(M17:M44)", cache=redondo(subtotal))
-    xml = _poner(xml, "M46", formula=f"M45*{_num(d['iva_pct'] / 100)}", cache=redondo(iva))
-    xml = _poner(xml, "M47", numero=d["isr"]) if d["isr"] is not None else _poner(xml, "M47")
-    if d["total"] is not None:
-        xml = _poner(xml, "M48", numero=d["total"])
-    else:
-        xml = _poner(xml, "M48", formula="SUM(M45+M46)-M47", cache=redondo(total))
+        xml = _poner(xml, f"K{fila}", numero=Decimal(0))
+        xml = _poner(xml, f"M{fila}", formula=f"A{fila}*K{fila}", cache=Decimal(0))
 
     xml = _poner(xml, "A49", texto=_con_etiqueta("OBSERVACIONES:", d["observaciones"]))
     return xml

@@ -5,11 +5,32 @@ import Paginador, { usePagina } from './Paginador'
 const ACCIONES = [
   ['salida', 'Salidas (entregas)'],
   ['entrada', 'Entradas'],
+  ['anulacion', 'Movimientos anulados'],
+  ['nota_alta', 'Checklist: agregado'],
+  ['nota_edicion', 'Checklist: editado'],
+  ['nota_baja', 'Checklist: quitado'],
+  ['nota_requisicion', 'Checklist: enviado a requisición'],
+  ['nota_completada', 'Checklist: completado'],
+  ['requisicion_excel', 'Requisición descargada'],
+  ['consumible_alta', 'Consumible creado'],
+  ['consumible_edicion', 'Consumible editado'],
+  ['impresora_alta', 'Impresora creada'],
+  ['impresora_edicion', 'Impresora editada'],
+  ['impresora_baja', 'Impresora eliminada'],
+  ['linea_alta', 'Consumible agregado a impresora'],
+  ['linea_baja', 'Consumible quitado de impresora'],
+  ['usuario_alta', 'Usuario creado'],
+  ['usuario_edicion', 'Usuario editado'],
+  ['login', 'Inicio de sesión'],
+  ['logout', 'Cierre de sesión'],
+  ['login_fallido', 'Intento de sesión fallido'],
 ]
 
-const PERMITIDAS = ACCIONES.map(([v]) => v).join(',')
+const VERDES = ['entrada', 'nota_alta', 'nota_completada', 'consumible_alta', 'impresora_alta', 'linea_alta', 'usuario_alta', 'login']
+const AMBAR = ['salida', 'nota_edicion', 'nota_requisicion', 'requisicion_excel', 'consumible_edicion', 'impresora_edicion', 'usuario_edicion']
+const ROJOS = ['anulacion', 'nota_baja', 'impresora_baja', 'linea_baja', 'login_fallido']
 
-const tono = (a) => (a === 'entrada' ? 'entrada' : 'salida')
+const tono = (a) => (VERDES.includes(a) ? 'entrada' : ROJOS.includes(a) ? 'agotado' : AMBAR.includes(a) ? 'salida' : 'neutro')
 
 export default function Historial({ filas = 25 }) {
   const [usuarios, setUsuarios] = useState([])
@@ -28,7 +49,6 @@ export default function Historial({ filas = 25 }) {
     const params = {}
     if (filtroUsuario) params.usuario = filtroUsuario
     if (filtroAccion) params.accion = filtroAccion
-    else params.acciones = PERMITIDAS
     setCargando(true)
     try {
       setActividad(await api.actividad(params))
@@ -66,7 +86,7 @@ export default function Historial({ filas = 25 }) {
             {usuarios.map((u) => <option key={u.id} value={u.username}>{u.username}</option>)}
           </select>
           <select className="search" value={filtroAccion} onChange={(e) => setFiltroAccion(e.target.value)}>
-            <option value="">Entradas y salidas</option>
+            <option value="">Toda la actividad</option>
             {ACCIONES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
           <button className="btn secondary" type="button" onClick={cargar} disabled={cargando}>

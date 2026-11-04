@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 
 const UNIDADES = ['PIEZA', 'CAJA', 'PAQUETE', 'JUEGO', 'LITRO', 'KILO', 'METRO', 'SERVICIO']
-const VACIO = { item: '', cantidad: '1', unidad: 'PIEZA', costo: '', link: '', descripcion: '' }
+const VACIO = { item: '', cantidad: '1', unidad: 'PIEZA', link: '', descripcion: '' }
 
 const desdeNota = (n) => ({
   item: n.item,
   cantidad: String(n.cantidad),
   unidad: n.unidad,
-  costo: n.costo == null ? '' : String(n.costo),
   link: n.link,
   descripcion: n.descripcion,
 })
@@ -69,15 +68,10 @@ export default function PendienteModal({ nota, onClose, onGuardar }) {
             </select>
           </label>
         </div>
-        <div className="fila-2">
-          <label>Costo unitario
-            <input type="number" min="0" step="0.01" value={f.costo} onChange={set('costo')} placeholder="Opcional" />
-          </label>
-          <label>Enlace
-            <input inputMode="url" maxLength={500} value={f.link} onChange={set('link')}
-              autoComplete="off" placeholder="https://… (opcional)" />
-          </label>
-        </div>
+        <label>Enlace
+          <input inputMode="url" maxLength={500} value={f.link} onChange={set('link')}
+            autoComplete="off" placeholder="https://… (opcional)" />
+        </label>
         <label>Descripción
           <input value={f.descripcion} maxLength={500} onChange={set('descripcion')}
             autoComplete="off" placeholder="Opcional" />

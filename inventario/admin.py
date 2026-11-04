@@ -61,6 +61,6 @@ class UsuarioAdmin(UserAdmin):
 
 @admin.register(NotaCompra)
 class NotaCompraAdmin(admin.ModelAdmin):
-    list_display = ("item", "cantidad", "unidad", "costo", "completado", "usuario", "creado")
+    list_display = ("item", "cantidad", "unidad", "completado", "usuario", "creado")
     list_filter = ("completado",)
     search_fields = ("item", "descripcion")

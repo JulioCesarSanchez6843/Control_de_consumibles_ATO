@@ -127,6 +127,12 @@ class Actividad(models.Model):
         ("linea_baja", "Consumible quitado de impresora"),
         ("usuario_alta", "Usuario creado"),
         ("usuario_edicion", "Usuario editado"),
+        ("nota_alta", "Checklist: artículo agregado"),
+        ("nota_edicion", "Checklist: artículo editado"),
+        ("nota_baja", "Checklist: artículo quitado"),
+        ("nota_requisicion", "Checklist: enviado a requisición"),
+        ("nota_completada", "Checklist: completado con la requisición"),
+        ("requisicion_excel", "Requisición descargada"),
     ]
 
     fecha = models.DateTimeField(default=timezone.now, db_index=True)
@@ -151,7 +157,6 @@ class NotaCompra(models.Model):
     item = models.CharField(max_length=200)
     cantidad = models.DecimalField(max_digits=10, decimal_places=2, default=1)
     unidad = models.CharField(max_length=30, default="PIEZA")
-    costo = models.DecimalField("costo unitario", max_digits=10, decimal_places=2, null=True, blank=True)
     link = models.URLField(max_length=500, blank=True)
     descripcion = models.CharField("descripción", max_length=500, blank=True)
     completado = models.BooleanField(default=False)

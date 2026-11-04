@@ -504,6 +504,12 @@ def requisicion_excel(request):
         return _err("No se encontró la plantilla inventario/plantillas/requisicion.xlsm", 500)
     nombre = "Requisicion " + (datos["folio"] or datos["fecha_solicitud"].replace("/", "-")) + ".xlsm"
     nombre = re.sub(r'[\\/:*?"<>|]', "-", nombre)
+    resumen = ", ".join(
+        f"{_cant(l['cantidad']) if l['cantidad'] is not None else '?'} {l['unidad']} {l['descripcion']}".strip()
+        for l in datos["lineas"])
+    auditoria.registrar("requisicion_excel", usuario=request.user, request=request,
+                        detalle=f"Folio {datos['folio'] or 's/f'} · {datos['departamento']} · "
+                                f"{len(datos['lineas'])} artículo(s): {resumen}")
     respuesta = HttpResponse(contenido, content_type="application/vnd.ms-excel.sheet.macroEnabled.12")
     respuesta["Content-Disposition"] = content_disposition_header(True, nombre)
     return respuesta
@@ -525,12 +531,36 @@ def _decimal(v, nombre, minimo=Decimal("0"), vacio_ok=False):
         raise ValueError(f"{nombre} es demasiado grande")
     return n.quantize(Decimal("0.01"))
 
+ETIQUETAS_NOTA = (
+    ("item", "artículo"),
+    ("cantidad", "cantidad"),
+    ("unidad", "unidad"),
+    ("link", "enlace"),
+    ("descripcion", "descripción"),
+)
+
+
+def _cant(v):
+    return format(Decimal(str(v)).normalize(), "f")
+
+
+def _resumen_nota(n):
+    return f"{n.item} ({_cant(n.cantidad)} {n.unidad})"
+
+
+def _cambios_nota(antes, n):
+    cambios = []
+    for campo, nombre in ETIQUETAS_NOTA:
+        a, b = antes[campo], getattr(n, campo)
+        if campo == "cantidad":
+            a, b = _cant(a), _cant(b)
+        if a != b:
+            cambios.append(f"{nombre}: {a or '—'} → {b or '—'}")
+    return "; ".join(cambios)
 
 def _nota(n):
     return {"id": n.pk, "item": n.item, "cantidad": float(n.cantidad), "unidad": n.unidad,
-            "costo": float(n.costo) if n.costo is not None else None, "link": n.link,
-            "descripcion": n.descripcion, "completado": n.completado}
-
+            "link": n.link, "descripcion": n.descripcion, "completado": n.completado}
 
 def _aplicar_nota(n, d):
     if "item" in d:
@@ -541,8 +571,6 @@ def _aplicar_nota(n, d):
         n.cantidad = _decimal(d["cantidad"], "La cantidad", minimo=Decimal("0.01"))
     if "unidad" in d:
         n.unidad = _txt(d, "unidad") or "PIEZA"
-    if "costo" in d:
-        n.costo = _decimal(d["costo"], "El costo", vacio_ok=True)
     if "link" in d:
         link = _txt(d, "link")
         if link and not re.match(r"^https?://", link, re.I):
@@ -567,6 +595,15 @@ def notas_compra(request):
         return _err("El item es obligatorio")
     n.usuario = request.user
     n.save()
+    extra = []
+    if n.descripcion:
+        extra.append(f"descripción: {n.descripcion}")
+    if n.link:
+        extra.append(f"enlace: {n.link}")
+    detalle = f"Agregó al checklist: {_resumen_nota(n)}"
+    if extra:
+        detalle += " · " + " · ".join(extra)
+    auditoria.registrar("nota_alta", usuario=request.user, request=request, detalle=detalle)
     return JsonResponse(_nota(n), status=201)
 
 
@@ -577,11 +614,36 @@ def nota_compra_detalle(request, pk):
     except NotaCompra.DoesNotExist:
         return _err("Nota no encontrada", 404)
     if request.method == "DELETE":
+        resumen = _resumen_nota(n)
+        completada = request.GET.get("motivo") == "requisicion"
         n.delete()
+        if completada:
+            auditoria.registrar("nota_completada", usuario=request.user, request=request,
+                                detalle=f"Se descargó la requisición y salió del checklist: {resumen}")
+        else:
+            auditoria.registrar("nota_baja", usuario=request.user, request=request,
+                                detalle=f"Quitó del checklist: {resumen}")
         return JsonResponse({"ok": True})
+    antes = {campo: getattr(n, campo) for campo, _ in ETIQUETAS_NOTA}
     try:
         _aplicar_nota(n, _body(request))
     except ValueError as e:
         return _err(str(e))
     n.save()
+    cambios = _cambios_nota(antes, n)
+    if cambios:
+        auditoria.registrar("nota_edicion", usuario=request.user, request=request,
+                            detalle=f"Editó «{antes['item']}»: {cambios}")
     return JsonResponse(_nota(n))
+
+
+@require_POST
+def notas_a_requisicion(request):
+    d = _body(request)
+    ids = d.get("ids") if isinstance(d.get("ids"), list) else []
+    ids = [i for i in ids if isinstance(i, int)]
+    notas = list(NotaCompra.objects.filter(pk__in=ids))
+    for n in notas:
+        auditoria.registrar("nota_requisicion", usuario=request.user, request=request,
+                            detalle=f"Pasó a la requisición: {_resumen_nota(n)}")
+    return JsonResponse({"ok": True, "registrados": len(notas)})
