@@ -1,32 +1,23 @@
 import { useState } from 'react'
 import { api } from '../api'
-import Paginador, { usePagina } from './Paginador'
+import Paginador from './Paginador'
+import useListaPaginada from '../useListaPaginada'
 import ConsumibleModal from './ConsumibleModal'
 
-export default function Stock({ consumables, departamentos, onChange, onMover, onRecibir, filas = 25 }) {
-  const [q, setQ] = useState('')
-  const [filtro, setFiltro] = useState('todos')
-  const [depto, setDepto] = useState('')
+export default function Stock({ departamentos, onChange, onMover, onRecibir, filas = 25 }) {
   const [mostrarForm, setMostrarForm] = useState(false)
   const [errMin, setErrMin] = useState('')
 
   const estado = (c) => (c.stock === 0 ? 'agotado' : c.stock <= c.stock_minimo ? 'bajo' : 'ok')
-  const orden = { agotado: 0, bajo: 1, ok: 2 }
-
-  const deDepto = consumables.filter((c) => !depto || c.departamento === depto)
-  const bajos = deDepto.filter((c) => estado(c) === 'bajo').length
-  const agotados = deDepto.filter((c) => estado(c) === 'agotado').length
-
-  const lista = deDepto
-    .filter((c) => filtro === 'todos' || estado(c) === filtro)
-    .filter((c) => `${c.departamento} ${c.modelo} ${c.descripcion} ${c.marca} ${c.notas}`.toLowerCase().includes(q.toLowerCase()))
-    .sort((a, b) => orden[estado(a)] - orden[estado(b)] || a.modelo.localeCompare(b.modelo))
-    
-  const pag = usePagina(lista, filas)
+  const lista = useListaPaginada(api.stock, { filas, claves: ['depto', 'estado'] })
+  const pag = lista.pag
+  const filtro = lista.filtros.estado || 'todos'
+  const resumen = lista.resumen || { total: 0, bajo: 0, agotado: 0 }
 
   const creado = () => {
     setMostrarForm(false)
     onChange()
+    lista.recargar()
   }
 
   const guardarDepto = async (c, valor) => {
@@ -36,6 +27,7 @@ export default function Stock({ consumables, departamentos, onChange, onMover, o
       await api.updateConsumable(c.id, { departamento: v })
       setErrMin('')
       onChange()
+      lista.recargar()
     } catch (ex) { setErrMin(ex.message) }
   }
 
@@ -46,6 +38,7 @@ export default function Stock({ consumables, departamentos, onChange, onMover, o
       await api.updateConsumable(c.id, { stock_minimo: n })
       setErrMin('')
       onChange()
+      lista.recargar()
     } catch (ex) { setErrMin(ex.message) }
   }
 
@@ -54,12 +47,13 @@ export default function Stock({ consumables, departamentos, onChange, onMover, o
       <div className="toolbar">
         <h2>Inventario de consumibles</h2>
         <div className="toolbar">
-          <select style={{ width: 'auto', margin: 0 }} value={depto} onChange={(e) => setDepto(e.target.value)}>
+          <select style={{ width: 'auto', margin: 0 }} value={lista.filtros.depto}
+            onChange={(e) => lista.setFiltro('depto', e.target.value)}>
             <option value="">Todos los departamentos</option>
             {departamentos.map((d) => <option key={d} value={d}>{d}</option>)}
           </select>
-          <input className="search" placeholder="Buscar modelo, tipo, marca…" value={q}
-            onChange={(e) => setQ(e.target.value)} />
+          <input className="search" placeholder="Buscar modelo, tipo, marca…" value={lista.texto}
+            onChange={(e) => lista.setTexto(e.target.value)} />
           <button className="btn" type="button" onClick={() => setMostrarForm(true)}>
             + Nuevo consumible
           </button>
@@ -67,9 +61,9 @@ export default function Stock({ consumables, departamentos, onChange, onMover, o
       </div>
 
       <div className="stats">
-        {[['todos', 'Total', deDepto.length], ['bajo', 'Bajo', bajos], ['agotado', 'Agotado', agotados]].map(([k, l, n]) => (
+        {[['todos', 'Total', resumen.total], ['bajo', 'Bajo', resumen.bajo], ['agotado', 'Agotado', resumen.agotado]].map(([k, l, n]) => (
           <button key={k} type="button" className={'stat ' + k + (filtro === k ? ' active' : '')}
-            onClick={() => setFiltro(filtro === k ? 'todos' : k)}>
+            onClick={() => lista.setFiltro('estado', k === 'todos' || filtro === k ? '' : k)}>
             <strong>{n}</strong><span>{l}</span>
           </button>
         ))}
@@ -80,7 +74,7 @@ export default function Stock({ consumables, departamentos, onChange, onMover, o
         {departamentos.map((x) => <option key={x} value={x} />)}
       </datalist>
 
-      {errMin && <div className="alert error">{errMin}</div>}
+      {(errMin || lista.error) && <div className="alert error">{errMin || lista.error}</div>}
 
       <table>
         <thead>
@@ -121,7 +115,7 @@ export default function Stock({ consumables, departamentos, onChange, onMover, o
               </tr>
             )
           })}
-          {lista.length === 0 && <tr><td colSpan="9">Sin resultados.</td></tr>}
+          {!lista.cargando && pag.items.length === 0 && <tr><td colSpan="9">Sin resultados.</td></tr>}
         </tbody>
       </table>
       <Paginador p={pag} />

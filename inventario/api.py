@@ -6,6 +6,7 @@ from functools import wraps
 
 from django.conf import settings
 from django.core.cache import cache
+from django.db.models import Case, Count, F, IntegerField, Q, Value, When
 from django.contrib.auth import authenticate, get_user_model, login, logout, update_session_auth_hash
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
@@ -14,6 +15,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from . import auditoria, requisicion, services
+from .paginacion import paginar
 from .models import (Actividad, ArticuloFrecuente, Consumible, Impresora, ImpresoraConsumible, Movimiento,
                      NotaCompra)
 
@@ -225,7 +227,33 @@ def agregar_stock(request, pk):
 @require_http_methods(["GET", "POST"])
 def consumibles(request):
     if request.method == "GET":
-        return JsonResponse([_cons(c) for c in Consumible.objects.all()], safe=False)
+        if "pagina" not in request.GET:
+            return JsonResponse([_cons(c) for c in Consumible.objects.all()], safe=False)
+        base = Consumible.objects.all()
+        departamento = request.GET.get("depto", "").strip()
+        if departamento:
+            base = base.filter(departamento=departamento)
+        resumen = base.aggregate(
+            total=Count("id"),
+            bajo=Count("id", filter=Q(stock__gt=0, stock__lte=F("stock_minimo"))),
+            agotado=Count("id", filter=Q(stock=0)))
+        qs = base
+        estado = request.GET.get("estado", "").strip()
+        if estado == "agotado":
+            qs = qs.filter(stock=0)
+        elif estado == "bajo":
+            qs = qs.filter(stock__gt=0, stock__lte=F("stock_minimo"))
+        for palabra in request.GET.get("q", "").split()[:6]:
+            qs = qs.filter(
+                Q(departamento__icontains=palabra) | Q(modelo__icontains=palabra)
+                | Q(descripcion__icontains=palabra) | Q(marca__icontains=palabra)
+                | Q(notas__icontains=palabra))
+        qs = qs.annotate(prioridad=Case(
+            When(stock=0, then=Value(0)),
+            When(stock__lte=F("stock_minimo"), then=Value(1)),
+            default=Value(2), output_field=IntegerField(),
+        )).order_by("prioridad", "modelo", "id")
+        return paginar(request, qs, _cons, extra={"resumen": resumen})
     d = _body(request)
     modelo = _txt(d, "modelo")
     departamento = _txt(d, "departamento")
@@ -365,8 +393,19 @@ def departamentos(request):
 @require_http_methods(["GET", "POST"])
 def movimientos(request):
     if request.method == "GET":
-        qs = Movimiento.objects.select_related("consumible", "usuario", "anulado_por")[:500]
-        return JsonResponse([_mov(m) for m in qs], safe=False)
+        qs = Movimiento.objects.select_related("consumible", "usuario", "anulado_por")
+        tipo = request.GET.get("tipo", "").strip()
+        if tipo in (Movimiento.SALIDA, Movimiento.ENTRADA):
+            qs = qs.filter(tipo=tipo)
+        departamento = request.GET.get("depto", "").strip()
+        if departamento:
+            qs = qs.filter(departamento=departamento)
+        for palabra in request.GET.get("q", "").split()[:6]:
+            qs = qs.filter(
+                Q(consumible__modelo__icontains=palabra) | Q(consumible__descripcion__icontains=palabra)
+                | Q(departamento__icontains=palabra) | Q(persona__icontains=palabra)
+                | Q(notas__icontains=palabra) | Q(usuario__username__icontains=palabra))
+        return paginar(request, qs, _mov)
     d = _body(request)
     if d.get("tipo", Movimiento.SALIDA) != Movimiento.SALIDA:
         return _err("Las entradas se registran desde la pantalla Entradas")
@@ -456,6 +495,10 @@ def usuario_detalle(request, pk):
                         detalle=f"{u.username}: {', '.join(cambios) or 'sin cambios'}")
     return JsonResponse(_usuario_admin(u))
 
+def _actividad(a):
+    return {"id": a.pk, "fecha": timezone.localtime(a.fecha).strftime("%Y-%m-%d %H:%M"),
+            "username": a.username, "accion": a.accion, "accion_texto": a.get_accion_display(),
+            "detalle": a.detalle, "ip": a.ip or ""}
 
 @require_GET
 @solo_admin
@@ -470,10 +513,9 @@ def actividad(request):
         qs = qs.filter(accion=accion)
     elif acciones:
         qs = qs.filter(accion__in=acciones)
-    return JsonResponse([{
-        "id": a.pk, "fecha": timezone.localtime(a.fecha).strftime("%Y-%m-%d %H:%M"),
-        "username": a.username, "accion": a.accion, "accion_texto": a.get_accion_display(),
-        "detalle": a.detalle, "ip": a.ip or ""} for a in qs[:300]], safe=False)
+    for palabra in request.GET.get("q", "").split()[:6]:
+        qs = qs.filter(Q(detalle__icontains=palabra) | Q(username__icontains=palabra))
+    return paginar(request, qs, _actividad)
 
 
 DIST = settings.BASE_DIR / "frontend" / "dist"
@@ -673,7 +715,12 @@ def _frecuente(a):
 
 @require_GET
 def frecuentes(request):
-    return JsonResponse([_frecuente(a) for a in ArticuloFrecuente.objects.all()], safe=False)
+    if "pagina" not in request.GET:
+        return JsonResponse([_frecuente(a) for a in ArticuloFrecuente.objects.all()], safe=False)
+    qs = ArticuloFrecuente.objects.all()
+    for palabra in request.GET.get("q", "").split()[:6]:
+        qs = qs.filter(Q(descripcion__icontains=palabra) | Q(proveedor__icontains=palabra))
+    return paginar(request, qs.order_by("-veces", "-ultima_compra", "-id"), _frecuente)
 
 
 @require_http_methods(["DELETE"])

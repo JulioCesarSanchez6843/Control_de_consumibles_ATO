@@ -4,19 +4,18 @@ import { ChevronsLeft, ChevronsRight } from 'lucide-react'
 import usePersistido from '../usePersistido'
 import { useToast } from './Toast'
 import Combobox from './Combobox'
-import Paginador, { usePagina } from './Paginador'
+import Paginador from './Paginador'
+import useListaPaginada from '../useListaPaginada'
 
 const VACIO = { consumable_id: '', cantidad: 1, departamento: '', persona: '', notas: '' }
 
-export default function Salidas({ consumables, departamentos, printers, movements, prefill, onDone, filas = 25 }) {
+export default function Salidas({ consumables, departamentos, printers, prefill, onDone, filas = 25 }) {
   const [f, setF] = useState(VACIO)
   const [msg, setMsg] = useState(null)
-  const [q, setQ] = useState('')
   const [err, setErr] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [panel, setPanel] = usePersistido('panel-salidas', false)
   const toast = useToast()
-  const [deptoFiltro, setDeptoFiltro] = useState('')
   const selRef = useRef(null)
   const timer = useRef(null)
 
@@ -58,15 +57,8 @@ export default function Salidas({ consumables, departamentos, printers, movement
       }))
   }, [consumables, f.departamento])
 
-  const salidas = useMemo(() => {
-    const t = q.trim().toLowerCase()
-    return movements
-      .filter((m) => m.tipo === 'salida')
-      .filter((m) => !deptoFiltro || m.departamento === deptoFiltro)
-      .filter((m) => `${m.modelo} ${m.descripcion} ${m.departamento} ${m.persona} ${m.usuario} ${m.notas}`.toLowerCase().includes(t))
-  }, [movements, q, deptoFiltro])
-
-  const pag = usePagina(salidas, filas)
+  const lista = useListaPaginada(api.movements, { base: { tipo: 'salida' }, filas, claves: ['depto'] })
+  const pag = lista.pag
 
   const cantidad = Number(f.cantidad)
   const excede = !!sel && cantidad > sel.stock
@@ -84,6 +76,7 @@ export default function Salidas({ consumables, departamentos, printers, movement
       timer.current = setTimeout(() => setMsg(null), 4000)
       setF({ ...VACIO, persona: f.persona })
       onDone()
+      lista.recargar()
       if (selRef.current) selRef.current.focus()
     } catch (ex) {
       setMsg({ ok: false, text: ex.message })
@@ -98,6 +91,7 @@ export default function Salidas({ consumables, departamentos, printers, movement
       await api.anular(m.id)
       setErr('')
       onDone()
+      lista.recargar()
     } catch (ex) {
       setErr(ex.message)
     }
@@ -174,16 +168,16 @@ export default function Salidas({ consumables, departamentos, printers, movement
 
       <section className="card split-main">
         <div className="toolbar">
-          <h2>Bitácora de salidas <span className="contador">{salidas.length}</span></h2>
+          <h2>Bitácora de salidas <span className="contador">{pag.cantidad}</span></h2>
           <div className="toolbar">
-            <select className="filtro-sel" value={deptoFiltro} onChange={(e) => setDeptoFiltro(e.target.value)}>
+            <select className="filtro-sel" value={lista.filtros.depto} onChange={(e) => lista.setFiltro('depto', e.target.value)}>
               <option value="">Todos los departamentos</option>
               {departamentos.map((d) => <option key={d} value={d}>{d}</option>)}
             </select>
-            <input className="search" placeholder="Buscar…" value={q} onChange={(e) => setQ(e.target.value)} />
+            <input className="search" placeholder="Buscar…" value={lista.texto} onChange={(e) => lista.setTexto(e.target.value)} />
           </div>
         </div>
-        {err && <div className="alert error">{err}</div>}
+        {(err || lista.error) && <div className="alert error">{err || lista.error}</div>}
         <div className="tabla-scroll">
           <table className="excel">
             <thead>
@@ -209,7 +203,7 @@ export default function Salidas({ consumables, departamentos, printers, movement
                   </td>
                 </tr>
               ))}
-              {salidas.length === 0 && <tr><td colSpan="10">Sin salidas.</td></tr>}
+              {!lista.cargando && pag.items.length === 0 && <tr><td colSpan="10">Sin salidas.</td></tr>}
             </tbody>
           </table>
         </div>

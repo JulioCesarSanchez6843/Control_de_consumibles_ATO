@@ -103,6 +103,10 @@ class Movimiento(models.Model):
 
     class Meta:
         ordering = ["-id"]
+        indexes = [
+            models.Index(fields=["tipo", "-id"], name="mov_tipo_id_idx"),
+            models.Index(fields=["departamento"], name="mov_depto_idx"),
+        ]
         verbose_name = "movimiento"
         verbose_name_plural = "movimientos (bitácora)"
 

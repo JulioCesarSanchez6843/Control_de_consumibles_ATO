@@ -15,42 +15,15 @@ import PendientesCompra from './components/PendientesCompra'
 import Frecuentes from './components/Frecuentes'
 import useTema from './useTema'
 import { aplicar, normalizar } from './preferencias'
-import { Boxes, CheckCheck, ClipboardList, FileText, History as IcoHistorial, ListChecks, PackageMinus, PackagePlus, Printer, ShieldCheck, ShoppingCart, Star, Users, Warehouse } from 'lucide-react'
-
-const GRUPOS = [
-  { nombre: 'Bitácora', icono: ClipboardList, tabs: ['Salidas', 'Entradas'] },
-  { nombre: 'Inventarios', icono: Warehouse, tabs: ['Inventario', 'Impresoras'] },
-  { nombre: 'Compras', icono: ShoppingCart, tabs: ['Requisición', 'Por comprar', 'Frecuentes'] },
-  { nombre: 'Equipo TI', icono: ShieldCheck, tabs: ['Usuarios', 'Historial'], admin: true },
-]
-
-const ETIQUETAS = { Inventario: 'Stock' }
-
-const ICONOS = {
-  Salidas: PackageMinus,
-  Entradas: PackagePlus,
-  Inventario: Boxes,
-  Impresoras: Printer,
-  Usuarios: Users,
-  Historial: IcoHistorial,
-  'Por comprar': ListChecks,
-  Frecuentes: Star,
-}
-
-function Ico({ t }) {
-  const Icono = ICONOS[t] || FileText
-  return <Icono size={17} strokeWidth={2.2} />
-}
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { GRUPOS, INICIO, RUTA_INICIO_DEFECTO } from './rutas'
 
 export default function App() {
-  const [tab, setTab] = useState('Salidas')
+  const navigate = useNavigate()
+  const location = useLocation()
   const [consumables, setConsumables] = useState([])
-  const [movements, setMovements] = useState([])
   const [printers, setPrinters] = useState([])
   const [departamentos, setDepartamentos] = useState([])
-  const [prefill, setPrefill] = useState(null)
-  const [prefillEntrada, setPrefillEntrada] = useState(null)
-  const [prefillReq, setPrefillReq] = useState(null)
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(true)
   const [usuario, setUsuario] = useState(null)
@@ -73,10 +46,10 @@ export default function App() {
 
   const reload = useCallback(async () => {
     try {
-      const [c, m, p, d] = await Promise.all([
-        api.consumables(), api.movements(), api.printers(), api.departamentos(),
+      const [c, p, d] = await Promise.all([
+        api.consumables(), api.printers(), api.departamentos(),
       ])
-      setConsumables(c); setMovements(m); setPrinters(p); setDepartamentos(d)
+      setConsumables(c); setPrinters(p); setDepartamentos(d)
       setError('')
     } catch (e) {
       setError('No se pudo conectar con el servidor: ' + e.message)
@@ -88,7 +61,7 @@ export default function App() {
   useEffect(() => {
     api.csrf().catch(() => {})
       .then(() => api.me())
-      .then((u) => { setTab(normalizar(u.preferencias).inicio); setUsuario(u) })
+      .then(setUsuario)
       .catch(() => setUsuario(null))
       .finally(() => setSesionLista(true))
   }, [])
@@ -103,14 +76,10 @@ export default function App() {
     return () => window.removeEventListener('sesion-expirada', cerrar)
   }, [])
 
-  useEffect(() => {
-    if (tab !== 'Salidas') setPrefill(null)
-    if (tab !== 'Entradas') setPrefillEntrada(null)
-  }, [tab])
-
   const salir = async () => {
     try { await api.logout() } catch {}
     setUsuario(null)
+    navigate('/', { replace: true })
     setCargando(true)
   }
 
@@ -133,34 +102,35 @@ export default function App() {
   }
 
   const entregar = (consumable_id, departamento) => {
-    setPrefill({ consumable_id, departamento })
-    setTab('Salidas')
+    navigate('/bitacora/salidas', { state: { prefill: { consumable_id, departamento } } })
   }
 
   const recibir = (consumable_id) => {
-    setPrefillEntrada({ consumable_id })
-    setTab('Entradas')
+    navigate('/bitacora/entradas', { state: { prefill: { consumable_id } } })
   }
 
   const pasarARequisicion = (lineas) => {
-    setPrefillReq(lineas)
-    setTab('Requisición')
+    navigate('/compras/requisicion', { state: { lineas } })
+  }
+
+  const limpiarEstado = () => {
+    navigate(location.pathname + location.search, { replace: true, state: null })
   }
 
   const bajos = consumables.filter((c) => c.stock <= c.stock_minimo).length
   const grupos = GRUPOS.filter((g) => !g.admin || usuario?.es_admin)
-  const enAjustes = tab === 'Ajustes' || tab === 'Perfil'
-  const grupo = enAjustes ? null : (grupos.find((g) => g.tabs.includes(tab)) || grupos[0])
+  const grupo = grupos.find((g) => location.pathname.startsWith(g.ruta + '/')) || null
+  const enAjustes = !grupo
 
   if (!sesionLista) return <div className="cargando"><span className="spinner" />Cargando…</div>
-  if (!usuario) return <Login onLogin={(u) => { setTab(normalizar(u.preferencias).inicio); setUsuario(u) }} />
+  if (!usuario) return <Login onLogin={setUsuario} />
 
   return (
     <>
       <header className="topbar">
          <div className="marca" role="button" tabIndex={0} title="Ir a la bitácora"
-          onClick={() => setTab('Salidas')}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setTab('Salidas') } }}>
+          onClick={() => navigate('/bitacora/salidas')}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate('/bitacora/salidas') } }}>
           <img src="/static/logo_tollocan.png" alt="Grupo Tollocan" className="logo" />
           <div className="marca-texto">
             <strong>Control de consumibles</strong>
@@ -173,16 +143,16 @@ export default function App() {
             const activo = g === grupo
             return (
               <button key={g.nombre} className={activo ? 'active' : ''}
-                onClick={() => { if (!activo) setTab(g.tabs[0]) }}>
+                onClick={() => { if (!activo) navigate(g.tabs[0].ruta) }}>
                 <Icono size={17} strokeWidth={2.2} />
                 <span>{g.nombre}</span>
-                {g.tabs.includes('Inventario') && bajos > 0 && <span className="badge">{bajos}</span>}
+                {g.ruta === '/inventarios' && bajos > 0 && <span className="badge">{bajos}</span>}
               </button>
             )
           })}
         </nav>
         <div className="usuario">
-          <button type="button" className="usuario-perfil" title="Editar mi perfil" onClick={() => setTab('Perfil')}>
+          <button type="button" className="usuario-perfil" title="Editar mi perfil" onClick={() => navigate('/perfil')}>
             {usuario.foto
               ? <img className="avatar" src={usuario.foto} alt="" />
               : <div className="avatar">{(usuario.nombre || usuario.username || '?').slice(0, 1).toUpperCase()}</div>}
@@ -191,7 +161,7 @@ export default function App() {
               <span>{usuario.es_admin ? 'Encargado' : 'Becario'}</span>
             </div>
           </button>
-          <MenuUsuario onPerfil={() => setTab('Perfil')} onAjustes={() => setTab('Ajustes')} onSalir={salir} />
+          <MenuUsuario onPerfil={() => navigate('/perfil')} onAjustes={() => navigate('/ajustes')} onSalir={salir} />
         </div>
       </header>
 
@@ -199,13 +169,17 @@ export default function App() {
       {grupo && (
         <nav className="subnav" key={grupo.nombre}>
           <span className="subnav-titulo">{grupo.nombre}</span>
-          {grupo.tabs.map((t) => (
-            <button key={t} className={t === tab ? 'active' : ''} onClick={() => setTab(t)}>
-              <Ico t={t} />
-              <span>{ETIQUETAS[t] || t}</span>
-              {t === 'Inventario' && bajos > 0 && <span className="badge">{bajos}</span>}
-            </button>
-          ))}
+          {grupo.tabs.map((t) => {
+            const Icono = t.icono
+            return (
+              <button key={t.ruta} className={location.pathname.startsWith(t.ruta) ? 'active' : ''}
+                onClick={() => navigate(t.ruta)}>
+                <Icono size={17} strokeWidth={2.2} />
+                <span>{t.etiqueta}</span>
+                {t.ruta === '/inventarios/stock' && bajos > 0 && <span className="badge">{bajos}</span>}
+              </button>
+            )
+          })}
         </nav>
       )}
 
@@ -216,36 +190,45 @@ export default function App() {
       )}
       {cargando && <div className="cargando"><span className="spinner" />Cargando datos…</div>}
 
-      <main key={tab} hidden={cargando} className="vista">
-        {tab === 'Salidas' && (
-          <Salidas consumables={consumables} departamentos={departamentos} printers={printers}
-            movements={movements} prefill={prefill} onDone={reload} filas={prefs.filas} />
-        )}
-        {tab === 'Entradas' && (
-          <Entradas consumables={consumables} movements={movements} prefill={prefillEntrada} onDone={reload} filas={prefs.filas} />
-        )}
-        {tab === 'Inventario' && (
-            <Stock consumables={consumables} departamentos={departamentos} onChange={reload} filas={prefs.filas}
-            onMover={entregar} onRecibir={recibir} />
-        )}
-        {tab === 'Impresoras' && (
-          <Impresoras printers={printers} consumables={consumables} departamentos={departamentos}
-            onEntregar={entregar} onChange={reload} />
-        )}
-        {tab === 'Usuarios' && usuario.es_admin && <Usuarios usuarioActual={usuario} />}
-        {tab === 'Historial' && usuario.es_admin && <Historial filas={prefs.filas} />}
-        {tab === 'Requisición' && (
-          <Requisicion usuario={usuario} departamentos={departamentos} prefill={prefillReq}
-            onUsado={() => setPrefillReq(null)} />
-        )}
-        {tab === 'Por comprar' && <PendientesCompra usuario={usuario} onRequisicion={pasarARequisicion} />}
-        {tab === 'Frecuentes' && <Frecuentes onRequisicion={pasarARequisicion} filas={prefs.filas} />}
-        {tab === 'Ajustes' && (
-          <Ajustes prefs={prefs} onPref={guardarPref} onVista={setVista} />
-        )}
-        {tab === 'Perfil' && (
-          <Perfil usuario={usuario} onPerfil={setUsuario} onSalir={salir} />
-        )}
+      <main key={location.pathname} hidden={cargando} className="vista">
+        <Routes>
+          <Route path="/" element={<Navigate to={INICIO[prefs.inicio] || RUTA_INICIO_DEFECTO} replace />} />
+          <Route path="/bitacora/salidas" element={
+            <Salidas consumables={consumables} departamentos={departamentos} printers={printers}
+              prefill={location.state?.prefill} onDone={reload} filas={prefs.filas} />
+          } />
+          <Route path="/bitacora/entradas" element={
+            <Entradas consumables={consumables} prefill={location.state?.prefill}
+              onDone={reload} filas={prefs.filas} />
+          } />
+          <Route path="/inventarios/stock" element={
+            <Stock departamentos={departamentos} onChange={reload} filas={prefs.filas}
+              onMover={entregar} onRecibir={recibir} />
+          } />
+          <Route path="/inventarios/impresoras" element={
+            <Impresoras printers={printers} consumables={consumables} departamentos={departamentos}
+              onEntregar={entregar} onChange={reload} />
+          } />
+          <Route path="/compras/requisicion" element={
+            <Requisicion usuario={usuario} departamentos={departamentos} prefill={location.state?.lineas}
+              onUsado={limpiarEstado} />
+          } />
+          <Route path="/compras/por-comprar" element={
+            <PendientesCompra usuario={usuario} onRequisicion={pasarARequisicion} />
+          } />
+          <Route path="/compras/frecuentes" element={
+            <Frecuentes onRequisicion={pasarARequisicion} filas={prefs.filas} />
+          } />
+          <Route path="/equipo/usuarios" element={
+            usuario.es_admin ? <Usuarios usuarioActual={usuario} /> : <Navigate to="/" replace />
+          } />
+          <Route path="/equipo/historial" element={
+            usuario.es_admin ? <Historial filas={prefs.filas} /> : <Navigate to="/" replace />
+          } />
+          <Route path="/ajustes" element={<Ajustes prefs={prefs} onPref={guardarPref} onVista={setVista} />} />
+          <Route path="/perfil" element={<Perfil usuario={usuario} onPerfil={setUsuario} onSalir={salir} />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </main>
       </div>
       </div>

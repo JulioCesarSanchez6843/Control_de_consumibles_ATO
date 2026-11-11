@@ -4,11 +4,12 @@ import { ChevronsLeft, ChevronsRight } from 'lucide-react'
 import usePersistido from '../usePersistido'
 import { useToast } from './Toast'
 import Combobox from './Combobox'
-import Paginador, { usePagina } from './Paginador'
+import Paginador from './Paginador'
+import useListaPaginada from '../useListaPaginada'
 
 const VACIO = { consumable_id: '', cantidad: 1, proveedor: '', notas: '' }
 
-export default function Entradas({ consumables, movements, prefill, onDone, filas = 25 }) {
+export default function Entradas({ consumables, prefill, onDone, filas = 25 }) {
   const [f, setF] = useState(VACIO)
   const [msg, setMsg] = useState(null)
   const [err, setErr] = useState('')
@@ -16,8 +17,6 @@ export default function Entradas({ consumables, movements, prefill, onDone, fila
   const [panel, setPanel] = usePersistido('panel-entradas', false) 
   const toast = useToast()
   const [deptoSel, setDeptoSel] = useState('')
-  const [q, setQ] = useState('')
-  const [deptoFiltro, setDeptoFiltro] = useState('')
   const timer = useRef(null)
 
   useEffect(() => {
@@ -45,15 +44,8 @@ export default function Entradas({ consumables, movements, prefill, onDone, fila
       }))
   }, [consumables, deptoSel])
 
-  const entradas = useMemo(() => {
-    const t = q.trim().toLowerCase()
-    return movements
-      .filter((m) => m.tipo === 'entrada')
-      .filter((m) => !deptoFiltro || m.departamento === deptoFiltro)
-      .filter((m) => `${m.modelo} ${m.descripcion} ${m.departamento} ${m.persona} ${m.usuario} ${m.notas}`.toLowerCase().includes(t))
-  }, [movements, q, deptoFiltro])
-
-  const pag = usePagina(entradas, filas)
+  const lista = useListaPaginada(api.movements, { base: { tipo: 'entrada' }, filas, claves: ['depto'] })
+  const pag = lista.pag
 
   const mover = (d) => setF({ ...f, cantidad: Math.max(1, (Number(f.cantidad) || 1) + d) })
 
@@ -69,6 +61,7 @@ export default function Entradas({ consumables, movements, prefill, onDone, fila
       timer.current = setTimeout(() => setMsg(null), 4000)
       setF({ ...VACIO, proveedor: f.proveedor })
       onDone()
+      lista.recargar()
     } catch (ex) {
       setMsg({ ok: false, text: ex.message })
     } finally {
@@ -82,6 +75,7 @@ export default function Entradas({ consumables, movements, prefill, onDone, fila
       await api.anular(m.id)
       setErr('')
       onDone()
+      lista.recargar()
     } catch (ex) {
       setErr(ex.message)
     }
@@ -142,7 +136,7 @@ export default function Entradas({ consumables, movements, prefill, onDone, fila
 
       <section className="card split-main">
         <div className="toolbar">
-          <h2>Historial de entradas <span className="contador">{entradas.length}</span></h2>
+          <h2>Historial de entradas <span className="contador">{pag.cantidad}</span></h2>
           <div className="toolbar">
             <select className="filtro-sel" value={deptoFiltro} onChange={(e) => setDeptoFiltro(e.target.value)}>
               <option value="">Todos los departamentos</option>
@@ -177,7 +171,7 @@ export default function Entradas({ consumables, movements, prefill, onDone, fila
                   </td>
                 </tr>
               ))}
-              {entradas.length === 0 && <tr><td colSpan="10">Aún no hay entradas.</td></tr>}
+              {!lista.cargando && pag.items.length === 0 && <tr><td colSpan="10">Aún no hay entradas.</td></tr>}
             </tbody>
           </table>
         </div>
