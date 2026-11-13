@@ -20,6 +20,7 @@ urlpatterns = [
     path("printers/<int:pk>/lineas", api.impresora_linea_nueva),
     path("printers/lineas/<int:pk>", api.impresora_linea_detalle),
     path("departamentos", api.departamentos),
+    path("departamentos/gestion", api.departamentos_gestion),
     path("toners", api.toners),
     path("movements", api.movimientos),
     path("movements/<int:pk>/anular", api.anular),

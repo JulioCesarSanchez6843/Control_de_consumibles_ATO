@@ -1,4 +1,4 @@
-import { Boxes, ClipboardList, FileText, History as IcoHistorial, ListChecks, PackageMinus, PackagePlus, Printer, ShieldCheck, ShoppingCart, Star, Users, Warehouse } from 'lucide-react'
+import { Boxes, Building2, ClipboardList, FileText, History as IcoHistorial, ListChecks, PackageMinus, PackagePlus, Printer, ShieldCheck, ShoppingCart, Star, Users, Warehouse } from 'lucide-react'
 
 export const GRUPOS = [
   {
@@ -24,9 +24,10 @@ export const GRUPOS = [
     ],
   },
   {
-    nombre: 'Equipo TI', icono: ShieldCheck, ruta: '/equipo', admin: true,
+    nombre: 'Administración', icono: ShieldCheck, ruta: '/equipo', admin: true,
     tabs: [
       { etiqueta: 'Usuarios', icono: Users, ruta: '/equipo/usuarios' },
+      { etiqueta: 'Departamentos', icono: Building2, ruta: '/equipo/departamentos' },
       { etiqueta: 'Historial', icono: IcoHistorial, ruta: '/equipo/historial' },
     ],
   },

@@ -22,12 +22,14 @@ const ACCIONES = [
   ['linea_baja', 'Consumible quitado de impresora'],
   ['usuario_alta', 'Usuario creado'],
   ['usuario_edicion', 'Usuario editado'],
+  ['departamento_alta', 'Departamento creado'],
+  ['toner_alta', 'Tóner creado'],
   ['login', 'Inicio de sesión'],
   ['logout', 'Cierre de sesión'],
   ['login_fallido', 'Intento de sesión fallido'],
 ]
 
-const VERDES = ['entrada', 'nota_alta', 'nota_completada', 'consumible_alta', 'impresora_alta', 'linea_alta', 'usuario_alta', 'login']
+const VERDES = ['entrada', 'nota_alta', 'nota_completada', 'consumible_alta', 'impresora_alta', 'linea_alta', 'usuario_alta', 'departamento_alta', 'toner_alta', 'login']
 const AMBAR = ['salida', 'nota_edicion', 'nota_requisicion', 'requisicion_excel', 'consumible_edicion', 'impresora_edicion', 'usuario_edicion']
 const ROJOS = ['anulacion', 'nota_baja', 'impresora_baja', 'linea_baja', 'login_fallido']
 
@@ -42,29 +44,7 @@ export default function Historial({ filas = 25 }) {
     api.usuarios().then(setUsuarios).catch((ex) => setErrUsuarios(ex.message))
   }, [])
 
-  const cargar = useCallback(async () => {
-    const params = {}
-    if (filtroUsuario) params.usuario = filtroUsuario
-    if (filtroAccion) params.accion = filtroAccion
-    setCargando(true)
-    try {
-      setActividad(await api.actividad(params))
-      setErr('')
-    } catch (ex) {
-      setErr(ex.message)
-    } finally {
-      setCargando(false)
-    }
-  }, [filtroUsuario, filtroAccion])
-
-  useEffect(() => { cargar() }, [cargar])
-
-  const visibles = useMemo(() => {
-    const t = busqueda.trim().toLowerCase()
-    if (!t) return actividad
-    return actividad.filter((a) =>
-      a.detalle.toLowerCase().includes(t) || a.username.toLowerCase().includes(t))
-  }, [actividad, busqueda])
+  const pag = lista.pag
 
   return (
     <div className="card">

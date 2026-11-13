@@ -17,7 +17,7 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 from . import auditoria, requisicion, services
 from .paginacion import paginar
 from .models import (Actividad, ArticuloFrecuente, Consumible, Impresora, ImpresoraConsumible, Movimiento,
-                     NotaCompra, Toner)
+                     NotaCompra, Toner, Departamento)
 
 
 def _err(msg, status=400):
@@ -413,14 +413,43 @@ def impresora_linea_detalle(request, pk):
                                 f"{linea.impresora.marca} {linea.impresora.modelo}")
     return JsonResponse({"ok": True})
 
-
-@require_GET
-def departamentos(request):
+def _nombres_departamentos():
     a = Impresora.objects.exclude(departamento="").values_list("departamento", flat=True)
     b = Movimiento.objects.exclude(departamento="").values_list("departamento", flat=True)
     c = Consumible.objects.exclude(departamento="").values_list("departamento", flat=True)
-    return JsonResponse(sorted({d.strip() for d in list(a) + list(b) + list(c)}, key=str.lower), safe=False)
+    d = Departamento.objects.values_list("nombre", flat=True)
+    return sorted({n.strip() for n in list(a) + list(b) + list(c) + list(d)}, key=str.lower)
 
+
+@require_GET
+def departamentos(request):
+    return JsonResponse(_nombres_departamentos(), safe=False)
+
+
+@require_http_methods(["GET", "POST"])
+@solo_admin
+def departamentos_gestion(request):
+    if request.method == "GET":
+        registrados = {d.nombre.strip(): d for d in Departamento.objects.select_related("creado_por")}
+        filas = []
+        for nombre in _nombres_departamentos():
+            d = registrados.get(nombre)
+            filas.append({
+                "nombre": nombre,
+                "creado_por": d.creado_por.get_username() if d and d.creado_por else "",
+                "fecha": timezone.localtime(d.creado).strftime("%Y-%m-%d %H:%M") if d else ""})
+        return JsonResponse(filas, safe=False)
+    nombre = " ".join(_txt(_body(request), "nombre").split())
+    if not nombre:
+        return _err("El nombre es obligatorio")
+    if len(nombre) > 100:
+        return _err("El nombre es demasiado largo")
+    if nombre.lower() in {n.lower() for n in _nombres_departamentos()}:
+        return _err(f"El departamento '{nombre}' ya existe")
+    d = Departamento.objects.create(nombre=nombre, creado_por=request.user)
+    auditoria.registrar("departamento_alta", usuario=request.user, detalle=d.nombre)
+    return JsonResponse({"nombre": d.nombre, "creado_por": request.user.get_username(),
+                         "fecha": timezone.localtime(d.creado).strftime("%Y-%m-%d %H:%M")}, status=201)
 
 @require_http_methods(["GET", "POST"])
 def movimientos(request):

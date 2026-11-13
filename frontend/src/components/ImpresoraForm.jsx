@@ -35,12 +35,11 @@ export default function ImpresoraForm({ inicial, departamentos, onGuardado, onCa
         </div>
 
         <label>Departamento
-          <input required autoFocus list="lista-deptos" value={d.departamento}
-            onChange={set('departamento')} autoComplete="off" />
+          <select required autoFocus value={d.departamento} onChange={set('departamento')}>
+            <option value="">Elegir departamento…</option>
+            {departamentos.map((x) => <option key={x} value={x}>{x}</option>)}
+          </select>
         </label>
-        <datalist id="lista-deptos">
-          {departamentos.map((x) => <option key={x} value={x} />)}
-        </datalist>
 
         <div className="fila-2">
           <label>Marca

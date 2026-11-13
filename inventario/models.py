@@ -62,6 +62,19 @@ class Toner(models.Model):
     def __str__(self):
         return self.modelo    
 
+class Departamento(models.Model):
+    nombre = models.CharField(max_length=100, unique=True)
+    creado = models.DateTimeField(default=timezone.now)
+    creado_por = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name="departamentos_creados")
+
+    class Meta:
+        ordering = ["nombre"]
+        verbose_name = "departamento"
+        verbose_name_plural = "departamentos"
+
+    def __str__(self):
+        return self.nombre
 
 class Impresora(models.Model):
     marca = models.CharField(max_length=100, blank=True)
@@ -140,6 +153,7 @@ class Actividad(models.Model):
         ("linea_alta", "Consumible agregado a impresora"),
         ("linea_baja", "Consumible quitado de impresora"),
         ("toner_alta", "Tóner creado"),
+        ("departamento_alta", "Departamento creado"),
         ("usuario_alta", "Usuario creado"),
         ("usuario_edicion", "Usuario editado"),
         ("nota_alta", "Checklist: artículo agregado"),

@@ -184,15 +184,15 @@ export default function Requisicion({ usuario, departamentos, prefill, onUsado }
         </div>
         <div className="fila-2">
           <label>Departamento solicitante *
-            <input list="req-deptos" value={f.departamento} onChange={set('departamento')} />
+            <select value={f.departamento} onChange={set('departamento')}>
+              <option value="">Elegir departamento…</option>
+              {(departamentos || []).map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
           </label>
           <label>Solicitado por *
             <input value={f.solicitante} onChange={set('solicitante')} />
           </label>
         </div>
-        <datalist id="req-deptos">
-          {(departamentos || []).map((d) => <option key={d} value={d} />)}
-        </datalist>
         <div className="fila-2">
           <label>Fecha en que se necesita <span className="opc">(opcional)</span>
             <input type="date" value={f.fechaNecesita} onChange={set('fechaNecesita')} />

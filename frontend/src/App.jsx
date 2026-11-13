@@ -6,6 +6,7 @@ import Stock from './components/Stock'
 import Impresoras from './components/Impresoras'
 import Login from './components/Login'
 import Usuarios from './components/Usuarios'
+import Departamentos from './components/Departamentos'
 import Historial from './components/Historial'
 import MenuUsuario from './components/MenuUsuario'
 import Ajustes from './components/Ajustes'
@@ -222,6 +223,9 @@ export default function App() {
           } />
           <Route path="/equipo/usuarios" element={
             usuario.es_admin ? <Usuarios usuarioActual={usuario} /> : <Navigate to="/" replace />
+          } />
+          <Route path="/equipo/departamentos" element={
+            usuario.es_admin ? <Departamentos onChange={reload} /> : <Navigate to="/" replace />
           } />
           <Route path="/equipo/historial" element={
             usuario.es_admin ? <Historial filas={prefs.filas} /> : <Navigate to="/" replace />

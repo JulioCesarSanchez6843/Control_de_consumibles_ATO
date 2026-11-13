@@ -42,12 +42,11 @@ export default function ConsumibleModal({ onClose, onCreated, departamentos }) {
         </div>
 
         <label>Departamento
-          <input list="deptos-consumible" value={f.departamento} onChange={set('departamento')}
-            required autoFocus autoComplete="off" />
+          <select value={f.departamento} onChange={set('departamento')} required autoFocus>
+            <option value="">Elegir departamento…</option>
+            {departamentos.map((x) => <option key={x} value={x}>{x}</option>)}
+          </select>
         </label>
-        <datalist id="deptos-consumible">
-          {departamentos.map((x) => <option key={x} value={x} />)}
-        </datalist>
 
         <label>Modelo
           <input value={f.modelo} onChange={set('modelo')} required 

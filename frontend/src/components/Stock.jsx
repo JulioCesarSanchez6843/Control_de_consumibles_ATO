@@ -76,9 +76,6 @@ export default function Stock({ departamentos, onChange, onMover, onRecibir, fil
 
       {mostrarForm && <ConsumibleModal departamentos={departamentos} onClose={() => setMostrarForm(false)} onCreated={creado} />}
       {mostrarToner && <TonerModal onClose={() => setMostrarToner(false)} onCreated={() => { setMostrarToner(false); onChange() }} />}
-      <datalist id="deptos-stock">
-        {departamentos.map((x) => <option key={x} value={x} />)}
-      </datalist>
 
       {(errMin || lista.error) && <div className="alert error">{errMin || lista.error}</div>}
 
@@ -94,9 +91,11 @@ export default function Stock({ departamentos, onChange, onMover, onRecibir, fil
               <tr key={c.id} className={'fila ' + est}>
                 <td>
                   {c.departamento || (
-                    <input style={{ width: 150, margin: 0 }} list="deptos-stock" placeholder="Asignar…"
-                      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
-                      onBlur={(e) => guardarDepto(c, e.target.value)} />
+                    <select style={{ width: 150, margin: 0 }} value=""
+                      onChange={(e) => guardarDepto(c, e.target.value)}>
+                      <option value="">Asignar…</option>
+                      {departamentos.map((x) => <option key={x} value={x}>{x}</option>)}
+                    </select>
                   )}
                 </td>
                 <td>{c.modelo}</td><td>{c.descripcion}</td><td>{c.notas}</td>
