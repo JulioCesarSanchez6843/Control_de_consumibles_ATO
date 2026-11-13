@@ -3,9 +3,11 @@ import { api } from '../api'
 import Paginador from './Paginador'
 import useListaPaginada from '../useListaPaginada'
 import ConsumibleModal from './ConsumibleModal'
+import TonerModal from './TonerModal'
 
 export default function Stock({ departamentos, onChange, onMover, onRecibir, filas = 25 }) {
   const [mostrarForm, setMostrarForm] = useState(false)
+  const [mostrarToner, setMostrarToner] = useState(false)
   const [errMin, setErrMin] = useState('')
 
   const estado = (c) => (c.stock === 0 ? 'agotado' : c.stock <= c.stock_minimo ? 'bajo' : 'ok')
@@ -54,6 +56,9 @@ export default function Stock({ departamentos, onChange, onMover, onRecibir, fil
           </select>
           <input className="search" placeholder="Buscar modelo, tipo, marca…" value={lista.texto}
             onChange={(e) => lista.setTexto(e.target.value)} />
+          <button className="btn secondary" type="button" onClick={() => setMostrarToner(true)}>
+            + Nuevo tóner
+          </button>          
           <button className="btn" type="button" onClick={() => setMostrarForm(true)}>
             + Nuevo consumible
           </button>
@@ -70,6 +75,7 @@ export default function Stock({ departamentos, onChange, onMover, onRecibir, fil
       </div>
 
       {mostrarForm && <ConsumibleModal departamentos={departamentos} onClose={() => setMostrarForm(false)} onCreated={creado} />}
+      {mostrarToner && <TonerModal onClose={() => setMostrarToner(false)} onCreated={() => { setMostrarToner(false); onChange() }} />}
       <datalist id="deptos-stock">
         {departamentos.map((x) => <option key={x} value={x} />)}
       </datalist>
@@ -78,7 +84,7 @@ export default function Stock({ departamentos, onChange, onMover, onRecibir, fil
 
       <table>
         <thead>
-          <tr><th>Departamento</th><th>Modelo</th><th>Descripción</th><th>Marca</th><th>Notas</th><th className="num">Stock</th>
+          <tr><th>Departamento</th><th>Modelo</th><th>Descripción</th><th>Notas</th><th className="num">Stock</th>
             <th className="num">Mínimo</th><th>Estado</th><th>Acciones</th></tr>
         </thead>
         <tbody>
@@ -93,7 +99,7 @@ export default function Stock({ departamentos, onChange, onMover, onRecibir, fil
                       onBlur={(e) => guardarDepto(c, e.target.value)} />
                   )}
                 </td>
-                <td>{c.modelo}</td><td>{c.descripcion}</td><td>{c.marca}</td><td>{c.notas}</td>
+                <td>{c.modelo}</td><td>{c.descripcion}</td><td>{c.notas}</td>
                 <td className="num">
                   <strong>{c.stock}</strong>
                   <div className="barra">

@@ -23,6 +23,7 @@ export default function App() {
   const location = useLocation()
   const [consumables, setConsumables] = useState([])
   const [printers, setPrinters] = useState([])
+  const [toners, setToners] = useState([])
   const [departamentos, setDepartamentos] = useState([])
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(true)
@@ -46,10 +47,10 @@ export default function App() {
 
   const reload = useCallback(async () => {
     try {
-      const [c, p, d] = await Promise.all([
-        api.consumables(), api.printers(), api.departamentos(),
+      const [c, p, d, t] = await Promise.all([
+        api.consumables(), api.printers(), api.departamentos(), api.toners(),
       ])
-      setConsumables(c); setPrinters(p); setDepartamentos(d)
+      setConsumables(c); setPrinters(p); setDepartamentos(d); setToners(t)
       setError('')
     } catch (e) {
       setError('No se pudo conectar con el servidor: ' + e.message)
@@ -206,7 +207,7 @@ export default function App() {
               onMover={entregar} onRecibir={recibir} />
           } />
           <Route path="/inventarios/impresoras" element={
-            <Impresoras printers={printers} consumables={consumables} departamentos={departamentos}
+            <Impresoras printers={printers} consumables={consumables} toners={toners} departamentos={departamentos}
               onEntregar={entregar} onChange={reload} />
           } />
           <Route path="/compras/requisicion" element={

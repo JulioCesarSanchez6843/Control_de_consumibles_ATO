@@ -53,7 +53,7 @@ export default function Salidas({ consumables, departamentos, printers, prefill,
         label: `${c.modelo} · ${c.descripcion}`,
         sub: `Stock ${c.stock}`,
         bajo: c.stock <= c.stock_minimo,
-        buscar: `${c.modelo} ${c.descripcion} ${c.marca}`,
+        buscar: `${c.modelo} ${c.descripcion}`,
       }))
   }, [consumables, f.departamento])
 

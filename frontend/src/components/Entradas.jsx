@@ -40,7 +40,7 @@ export default function Entradas({ consumables, prefill, onDone, filas = 25 }) {
         label: `${c.modelo} · ${c.descripcion}`,
         sub: `${c.departamento} · stock ${c.stock}`,
         bajo: c.stock <= c.stock_minimo,
-        buscar: `${c.departamento} ${c.modelo} ${c.descripcion} ${c.marca}`,
+        buscar: `${c.departamento} ${c.modelo} ${c.descripcion}`,
       }))
   }, [consumables, deptoSel])
 

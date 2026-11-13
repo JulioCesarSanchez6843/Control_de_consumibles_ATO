@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
 
-const NUEVO = { departamento: '', modelo: '', descripcion: '', marca: '', stock: 0, stock_minimo: 1 }
+const NUEVO = { departamento: '', modelo: '', descripcion: '', stock: 0, stock_minimo: 1 }
 
 export default function ConsumibleModal({ onClose, onCreated, departamentos }) {
   const [f, setF] = useState(NUEVO)
@@ -53,15 +53,10 @@ export default function ConsumibleModal({ onClose, onCreated, departamentos }) {
           <input value={f.modelo} onChange={set('modelo')} required 
             placeholder="Ej. TN850" autoComplete="off" />
         </label>
-        <div className="fila-2">
-          <label>Descripción
-            <input value={f.descripcion} onChange={set('descripcion')}
-              placeholder="Toner, Tinta…" autoComplete="off" />
-          </label>
-          <label>Marca
-            <input value={f.marca} onChange={set('marca')} autoComplete="off" />
-          </label>
-        </div>
+        <label>Descripción
+          <input value={f.descripcion} onChange={set('descripcion')}
+            placeholder="Tinta, Tambor…" autoComplete="off" />
+        </label>
         <div className="fila-2">
           <label>Stock inicial
             <input type="number" min="0" value={f.stock} onChange={set('stock')} />

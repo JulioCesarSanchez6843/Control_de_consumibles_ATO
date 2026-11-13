@@ -17,7 +17,7 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 from . import auditoria, requisicion, services
 from .paginacion import paginar
 from .models import (Actividad, ArticuloFrecuente, Consumible, Impresora, ImpresoraConsumible, Movimiento,
-                     NotaCompra)
+                     NotaCompra, Toner)
 
 
 def _err(msg, status=400):
@@ -52,7 +52,11 @@ def _bool(v):
 
 def _cons(c):
     return {"id": c.pk, "modelo": c.modelo, "departamento": c.departamento, "descripcion": c.descripcion,
-            "marca": c.marca, "notas": c.notas, "stock": c.stock, "stock_minimo": c.stock_minimo}
+            "notas": c.notas, "stock": c.stock, "stock_minimo": c.stock_minimo}
+
+
+def _toner(t):
+    return {"id": t.pk, "modelo": t.modelo}
 
 
 def _mov(m):
@@ -246,7 +250,7 @@ def consumibles(request):
         for palabra in request.GET.get("q", "").split()[:6]:
             qs = qs.filter(
                 Q(departamento__icontains=palabra) | Q(modelo__icontains=palabra)
-                | Q(descripcion__icontains=palabra) | Q(marca__icontains=palabra)
+                | Q(descripcion__icontains=palabra)
                 | Q(notas__icontains=palabra))
         qs = qs.annotate(prioridad=Case(
             When(stock=0, then=Value(0)),
@@ -266,7 +270,7 @@ def consumibles(request):
     try:
         c = Consumible.objects.create(
             modelo=modelo, departamento=departamento, descripcion=_txt(d, "descripcion"),
-            marca=_txt(d, "marca"), notas=_txt(d, "notas"),
+            notas=_txt(d, "notas"),
             stock=_entero(d.get("stock", 0), "El stock"), stock_minimo=_entero(d.get("stock_minimo", 1), "El mínimo"))
     except ValueError as e:
         return _err(str(e))
@@ -283,7 +287,7 @@ def consumible_detalle(request, pk):
         return _err("Consumible no encontrado", 404)
     d = _body(request)
     try:
-        for campo in ("departamento", "descripcion", "marca", "notas"):
+        for campo in ("departamento", "descripcion", "notas"):
             if campo in d:
                 setattr(c, campo, _txt(d, campo))
         if "departamento" in d:
@@ -297,9 +301,23 @@ def consumible_detalle(request, pk):
     except ValueError as e:
         return _err(str(e))
     c.save()
-    cambios = ", ".join(f"{k}={_txt(d, k)}" for k in ("departamento", "descripcion", "marca", "notas", "stock_minimo") if k in d)
+    cambios = ", ".join(f"{k}={_txt(d, k)}" for k in ("departamento", "descripcion", "notas", "stock_minimo") if k in d)
     auditoria.registrar("consumible_edicion", usuario=request.user, detalle=f"{c.modelo}: {cambios}")
     return JsonResponse(_cons(c))
+
+
+@require_http_methods(["GET", "POST"])
+def toners(request):
+    if request.method == "GET":
+        return JsonResponse([_toner(t) for t in Toner.objects.all()], safe=False)
+    modelo = _txt(_body(request), "modelo")
+    if not modelo:
+        return _err("El modelo es obligatorio")
+    if Toner.objects.filter(modelo__iexact=modelo).exists():
+        return _err(f"El tóner '{modelo}' ya está registrado")
+    t = Toner.objects.create(modelo=modelo)
+    auditoria.registrar("toner_alta", usuario=request.user, detalle=t.modelo)
+    return JsonResponse(_toner(t), status=201)
 
 
 def _datos_impresora(d):
@@ -353,11 +371,25 @@ def impresora_linea_nueva(request, pk):
     d = _body(request)
     try:
         p = Impresora.objects.get(pk=pk)
-        c = Consumible.objects.get(pk=_entero(d.get("consumable_id"), "El consumible", minimo=1))
+        if d.get("toner_id"):
+            t = Toner.objects.get(pk=_entero(d.get("toner_id"), "El tóner", minimo=1))
+            c = Consumible.objects.filter(
+                departamento__iexact=p.departamento.strip(), modelo__iexact=t.modelo).first()
+            if c is None:
+                c = Consumible.objects.create(
+                    modelo=t.modelo, departamento=p.departamento.strip(), descripcion="Toner",
+                    stock=0, stock_minimo=1)
+                auditoria.registrar(
+                    "consumible_alta", usuario=request.user,
+                    detalle=f"{c.departamento}: {c.modelo} (automático al asignar a {p.marca} {p.modelo})")
+        else:
+            c = Consumible.objects.get(pk=_entero(d.get("consumable_id"), "El consumible", minimo=1))
     except ValueError as e:
         return _err(str(e))
     except Impresora.DoesNotExist:
         return _err("Impresora no encontrada", 404)
+    except Toner.DoesNotExist:
+        return _err("Tóner no encontrado", 404)
     except Consumible.DoesNotExist:
         return _err("Consumible no encontrado", 404)
     if c.departamento.strip().lower() != p.departamento.strip().lower():

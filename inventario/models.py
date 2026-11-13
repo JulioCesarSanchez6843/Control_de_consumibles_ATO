@@ -30,7 +30,6 @@ class Consumible(models.Model):
     modelo = models.CharField(max_length=200)
     departamento = models.CharField(max_length=100, blank=True, default="")
     descripcion = models.CharField("descripción", max_length=100, blank=True)
-    marca = models.CharField(max_length=100, blank=True)
     notas = models.CharField(max_length=300, blank=True)
     stock = models.PositiveIntegerField(default=0)
     stock_minimo = models.PositiveIntegerField("stock mínimo", default=1)
@@ -51,6 +50,17 @@ class Consumible(models.Model):
         if self.stock == 0:
             return "agotado"
         return "bajo" if self.stock <= self.stock_minimo else "ok"
+
+class Toner(models.Model):
+    modelo = models.CharField(max_length=200, unique=True)
+
+    class Meta:
+        ordering = ["modelo"]
+        verbose_name = "tóner"
+        verbose_name_plural = "tóneres"
+
+    def __str__(self):
+        return self.modelo    
 
 
 class Impresora(models.Model):
@@ -129,6 +139,7 @@ class Actividad(models.Model):
         ("impresora_baja", "Impresora eliminada"),
         ("linea_alta", "Consumible agregado a impresora"),
         ("linea_baja", "Consumible quitado de impresora"),
+        ("toner_alta", "Tóner creado"),
         ("usuario_alta", "Usuario creado"),
         ("usuario_edicion", "Usuario editado"),
         ("nota_alta", "Checklist: artículo agregado"),

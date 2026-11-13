@@ -6,8 +6,8 @@ from .models import Actividad, Consumible, Impresora, ImpresoraConsumible, Movim
 
 @admin.register(Consumible)
 class ConsumibleAdmin(admin.ModelAdmin):
-    list_display = ("modelo", "descripcion", "marca", "stock", "stock_minimo")
-    search_fields = ("modelo", "descripcion", "marca")
+    list_display = ("modelo", "descripcion", "stock", "stock_minimo")
+    search_fields = ("modelo", "descripcion")
 
     def get_readonly_fields(self, request, obj=None):
         return ("stock",) if obj else ()

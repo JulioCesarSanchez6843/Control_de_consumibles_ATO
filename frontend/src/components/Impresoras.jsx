@@ -3,7 +3,7 @@ import { api } from '../api'
 import ImpresoraForm from './ImpresoraForm'
 import LineaNueva from './LineaNueva'
 
-export default function Impresoras({ printers, consumables, departamentos, onEntregar, onChange }) {
+export default function Impresoras({ printers, consumables, toners, departamentos, onEntregar, onChange }) {
   const [q, setQ] = useState('')
   const [form, setForm] = useState(null)
   const [err, setErr] = useState('')
@@ -57,7 +57,7 @@ export default function Impresoras({ printers, consumables, departamentos, onEnt
                     {' '}<button className="link" onClick={() => quitarLinea(l.id)}>Quitar</button>
                   </div>
                 ))}
-                <LineaNueva impresoraId={p.id} departamento={p.departamento} consumables={consumables}
+                <LineaNueva impresoraId={p.id} departamento={p.departamento} consumables={consumables} toners={toners}
                   onGuardado={onChange} onError={setErr} />
               </td>
               <td className="acciones">
