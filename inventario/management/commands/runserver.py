@@ -4,15 +4,22 @@ import subprocess
 
 from django.conf import settings
 from django.contrib.staticfiles.management.commands.runserver import Command as RunserverCommand
-
+from django.core.management import call_command
 
 class Command(RunserverCommand):
     default_port = "5050"
 
+
     def handle(self, *args, **options):
         if os.environ.get("RUN_MAIN") != "true":
+            # Crear administrador inicial si todavía no hay usuarios.
+            call_command("crear_admin_inicial")
+
+            # Compilar frontend.
             self.compilar_front()
+
         return super().handle(*args, **options)
+
 
     def compilar_front(self):
         front = settings.BASE_DIR / "frontend"
